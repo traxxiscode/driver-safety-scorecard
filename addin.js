@@ -544,6 +544,7 @@ var safetyDash = (function () {
       _schedEnabled = data.enabled || false;
       if (data.freq)       document.getElementById('schedFreq').value      = data.freq;
       if (data.dataRange)  document.getElementById('schedDataRange').value  = data.dataRange;
+      if (data.time)       document.getElementById('schedTime').value       = data.time;
       if (data.start)      document.getElementById('schedStart').value      = data.start;
       /* Clear and re-render chips */
       var wrap = document.getElementById('schedChips');
@@ -561,6 +562,7 @@ var safetyDash = (function () {
       enabled:   _schedEnabled,
       freq:      document.getElementById('schedFreq').value,
       dataRange: document.getElementById('schedDataRange').value,
+      time:      document.getElementById('schedTime').value,
       start:     document.getElementById('schedStart').value
     };
     FS.save('schedule', payload, cb);
@@ -824,11 +826,6 @@ var safetyDash = (function () {
 
     setRuleWt: function (rid, val) { if (_ruleConfig[rid]) _ruleConfig[rid].perEvent = parseInt(val, 10) || 1; },
 
-    saveRulesDefault: function () {
-      FS.save('ruleConfig', _ruleConfig, function (err) {
-        toast(err ? 'Could not save: ' + err.message : 'Rule config saved to Firestore', err ? '#ef4444' : '#10b981');
-      });
-    },
 
     saveRules: function () {
       if (_isFirstRun && !completeSetupIfReady()) return;
@@ -864,12 +861,6 @@ var safetyDash = (function () {
       });
     },
 
-    applyWeights: function () {
-      var total = getTotalWeight();
-      if (total !== 100) { equalizeWeightsData(); renderWeightsPanel(); }
-      if (_rawData.length) rebuildRows();
-      toast('Scores recalculated with new weights', '#FF7B01');
-    },
 
     saveWeights: function () {
       var total = getTotalWeight();

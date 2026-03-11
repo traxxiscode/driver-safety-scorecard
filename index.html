@@ -155,13 +155,13 @@
           <div class="wt-tooltip-popup">
             Weights must total exactly 100. Each rule's weight is its share of the total score penalty.
             Equal distribution is set automatically when rules change. You can override values —
-            the remaining weight redistributes proportionally. Weights are saved to Firestore.
+            the remaining weight redistributes proportionally.
           </div>
         </div>
       </div>
       <span class="panel-count" id="weightsCount"></span>
     </div>
-    <div class="panel-desc">Each weight is a percentage of the total score (must sum to 100). Higher weight = bigger impact. Rules are auto-equalized when added or removed. Changes are persisted to Firestore.</div>
+    <div class="panel-desc">Each weight is a percentage of the total score (must sum to 100). Higher weight = bigger impact. Rules are auto-equalized when added or removed.</div>
 
     <div class="wt-total-bar">
       <span class="wt-total-label">Total Weight</span>
@@ -178,15 +178,8 @@
     </div>
 
     <div class="panel-footer">
-      <button class="btn" onclick="safetyDash.resetWeights()">Reset to Factory</button>
-      <button class="btn btn-save" onclick="safetyDash.saveWeights()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-          <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
-        </svg>
-        Save to Firestore
-      </button>
-      <button class="btn btn-apply" onclick="safetyDash.applyWeights()">Apply &amp; Recalculate</button>
+      <button class="btn" onclick="safetyDash.resetWeights()">Reset to Default</button>
+      <button class="btn btn-apply" onclick="safetyDash.saveWeights()">Save &amp; Apply</button>
     </div>
   </div><!-- /#panelWeights -->
 
@@ -196,7 +189,7 @@
       <div class="panel-title">&#10003; Rule Configuration</div>
       <span class="panel-count" id="ruleCount"></span>
     </div>
-    <div class="panel-desc">Toggle which exception rules affect driver scores. Maximum 6 rules active at once. Rule config is auto-saved to Firestore on every toggle. Custom rules appear under Uncategorized.</div>
+    <div class="panel-desc">Toggle which exception rules affect driver scores. Maximum 6 rules active at once. Custom rules appear under Uncategorized.</div>
     <div class="rule-limit-warn" id="ruleLimitWarn">Maximum 6 rules selected. Disable a rule before enabling another.</div>
     <div id="rulesList">
       <div class="box"><div class="msg-txt">Load data first to see available rules.</div></div>
@@ -204,14 +197,7 @@
     <div class="panel-footer">
       <span class="panel-count" id="rulesEnabled"></span>
       <button class="btn" onclick="safetyDash.resetRules()" style="margin-left:auto;">Reset Rules</button>
-      <button class="btn btn-save" onclick="safetyDash.saveRulesDefault()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-          <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
-        </svg>
-        Save as Default
-      </button>
-      <button class="btn btn-apply" onclick="safetyDash.saveRules()">Apply &amp; Recalculate</button>
+      <button class="btn btn-apply" onclick="safetyDash.saveRules()">Save &amp; Apply</button>
     </div>
   </div><!-- /#panelRules -->
 
@@ -223,7 +209,6 @@
     </div>
     <div class="panel-desc">
       Automatically email the Driver Safety Scorecard as a CSV on a recurring schedule.
-      One schedule per Geotab database — config is saved to Firestore and read by your AWS EC2 backend.
       The subject line is always <em>Driver Safety Scorecard Report</em>.
     </div>
 
@@ -252,6 +237,19 @@
         <label>Start Date</label>
         <input type="date" class="sched-input" id="schedStart"/>
       </div>
+      <div class="sched-field">
+        <label>Start Time</label>
+        <select class="sched-sel" id="schedTime">
+          <option value="06:00">6:00 AM</option>
+          <option value="07:00">7:00 AM</option>
+          <option value="08:00" selected>8:00 AM</option>
+          <option value="09:00">9:00 AM</option>
+          <option value="10:00">10:00 AM</option>
+          <option value="12:00">12:00 PM</option>
+          <option value="14:00">2:00 PM</option>
+          <option value="17:00">5:00 PM</option>
+        </select>
+      </div>
     </div>
 
     <div class="sched-emails-wrap" style="margin-bottom:16px;">
@@ -271,13 +269,7 @@
     <div class="panel-footer">
       <button class="btn" onclick="safetyDash.togglePanel('schedule')">Cancel</button>
       <button class="btn" id="btnSchedDisable" onclick="safetyDash.disableSchedule()" style="display:none;">Disable Schedule</button>
-      <button class="btn btn-save" onclick="safetyDash.saveSchedule()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-          <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
-        </svg>
-        Save to Firestore
-      </button>
+      <button class="btn btn-apply" onclick="safetyDash.saveSchedule()">Save Schedule</button>
     </div>
   </div><!-- /#panelSchedule -->
 
@@ -302,7 +294,7 @@
 
       <div class="modal-section">
         <div class="modal-section-title">Weights</div>
-        <div class="modal-body">Each enabled rule has a <strong>Weight</strong> (0–100) representing its share of total score impact. All weights must sum to exactly 100. When rules change, weights are auto-equalized. <strong>Saved to Firestore</strong> for backend access.</div>
+        <div class="modal-body">Each enabled rule has a <strong>Weight</strong> (0–100) representing its share of total score impact. All weights must sum to exactly 100. When rules change, weights are auto-equalized.</div>
       </div>
 
       <div class="modal-section">
@@ -322,17 +314,9 @@
       </div>
 
       <div class="modal-section">
-        <div class="modal-section-title">Firestore & Backend</div>
-        <div class="modal-body">
-          Rule config, weights, and schedule settings are persisted to <strong>Cloud Firestore</strong>, keyed by Geotab database name.
-          Your AWS EC2 backend polls Firestore to discover which databases have active schedules and which recipients to email — no manual configuration needed on the server side.
-        </div>
-      </div>
-
-      <div class="modal-section">
         <div class="modal-section-title">Data Access &amp; Security</div>
         <div class="modal-body">
-          This add-in uses the authenticated Geotab API session. All driver, vehicle, and exception data is scoped to the logged-in user's group visibility in Geotab. No fleet data is stored externally — only configuration is written to Firestore.
+          This add-in uses the authenticated Geotab API session. All driver, vehicle, and exception data is scoped to the logged-in user's group visibility in Geotab.
         </div>
       </div>
     </div>
