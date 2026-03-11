@@ -691,19 +691,6 @@ td.td-driver { text-align: left; padding-left: 16px; }
 .sched-status.on  { display: block; background: rgba(16,185,129,.1);   border: 1px solid rgba(16,185,129,.3);   color: #10b981; }
 .sched-status.off { display: block; background: rgba(255,123,1,.08);   border: 1px solid rgba(255,123,1,.25);   color: var(--accent); }
 
-/* Firestore status indicator */
-.fs-status {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: .68rem; color: var(--text3); font-family: 'DM Mono', monospace;
-  padding: 4px 10px; border-radius: 99px;
-  border: 1px solid var(--border);
-  background: var(--bg3);
-}
-.fs-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); }
-.fs-status.fs-ok   .fs-dot { background: #10b981; }
-.fs-status.fs-err  .fs-dot { background: #ef4444; }
-.fs-status.fs-sync .fs-dot { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
-
 /* ── Info Modal ─────────────────────────────────────────── */
 .modal-overlay {
   position: fixed; inset: 0;

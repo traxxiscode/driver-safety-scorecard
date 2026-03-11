@@ -33,12 +33,9 @@ var FS = (function () {
          If anonymous auth isn't enabled in Firebase Console, we fall through
          and attempt Firestore ops anyway (useful during development). */
       firebase.auth().signInAnonymously()
-        .then(function () {
-          setFsStatus('ok', 'Firestore connected');
-        })
+        .then(function () { /* connected */ })
         .catch(function (e) {
-          console.warn('[SafetyScorecard] Anonymous auth failed — enable it in Firebase Console > Authentication > Sign-in methods. Proceeding without auth.', e.message);
-          setFsStatus('warn', 'Firestore (no auth)');
+          console.warn('[SafetyScorecard] Anonymous auth failed — enable it in Firebase Console > Authentication > Sign-in methods.', e.message);
         })
         .finally(function () {
           _ready = true;
@@ -47,7 +44,6 @@ var FS = (function () {
         });
       return; /* queue will be flushed after auth resolves/rejects */
     } catch (e) {
-      setFsStatus('err', 'Firestore error: ' + e.message);
       console.error('[SafetyScorecard] Firestore init failed:', e);
     }
   }
@@ -56,26 +52,17 @@ var FS = (function () {
     return _db.collection('driver_safety_scorecard').doc(_dbId + '__' + field);
   }
 
-  function setFsStatus(state, label) {
-    var el = document.getElementById('fsStatus');
-    if (!el) return;
-    el.className = 'fs-status fs-' + state;
-    el.innerHTML = '<span class="fs-dot"></span>' + label;
-  }
 
   function save(field, data, cb) {
     if (!_ready) {
       _queue.push(function () { save(field, data, cb); });
       return;
     }
-    setFsStatus('sync', 'Saving…');
     docRef(field).set(data)
       .then(function () {
-        setFsStatus('ok', 'Saved');
         if (typeof cb === 'function') cb(null);
       })
       .catch(function (e) {
-        setFsStatus('err', 'Save failed');
         console.error('[SafetyScorecard] Firestore save error:', e);
         if (typeof cb === 'function') cb(e);
       });
