@@ -257,7 +257,7 @@ var safetyDash = (function () {
       if (savedCfg && savedCfg[rule.id]) {
         _ruleConfig[rule.id] = { enabled: !!savedCfg[rule.id].enabled, category: savedCfg[rule.id].category || cat, perEvent: savedCfg[rule.id].perEvent || 3 };
       } else {
-        _ruleConfig[rule.id] = { enabled: cat !== 'other', category: cat, perEvent: 3 };
+        _ruleConfig[rule.id] = { enabled: false, category: cat, perEvent: 3 };
       }
     });
     if (savedWts) {
@@ -554,11 +554,13 @@ var safetyDash = (function () {
       if (err || !data) { if (typeof cb === 'function') cb(); return; }
       _schedEmails = data.emails || [];
       _schedEnabled = data.enabled || false;
-      if (data.freq)    document.getElementById('schedFreq').value    = data.freq;
-      if (data.day !== undefined) document.getElementById('schedDay').value = data.day;
-      if (data.time)    document.getElementById('schedTime').value    = data.time;
-      if (data.start)   document.getElementById('schedStart').value   = data.start;
-      if (data.subject) document.getElementById('schedSubject').value = data.subject;
+      if (data.freq)       document.getElementById('schedFreq').value      = data.freq;
+      if (data.dataRange)  document.getElementById('schedDataRange').value  = data.dataRange;
+      if (data.start)      document.getElementById('schedStart').value      = data.start;
+      /* Clear and re-render chips */
+      var wrap = document.getElementById('schedChips');
+      var input = document.getElementById('schedChipInput');
+      wrap.querySelectorAll('.schip').forEach(function (c) { c.remove(); });
       _schedEmails.forEach(function (e) { addSchedChipEl(e); });
       updateSchedStatus();
       if (typeof cb === 'function') cb();
@@ -567,13 +569,11 @@ var safetyDash = (function () {
 
   function saveScheduleData(cb) {
     var payload = {
-      emails:   _schedEmails,
-      enabled:  _schedEnabled,
-      freq:     document.getElementById('schedFreq').value,
-      day:      document.getElementById('schedDay').value,
-      time:     document.getElementById('schedTime').value,
-      start:    document.getElementById('schedStart').value,
-      subject:  document.getElementById('schedSubject').value
+      emails:    _schedEmails,
+      enabled:   _schedEnabled,
+      freq:      document.getElementById('schedFreq').value,
+      dataRange: document.getElementById('schedDataRange').value,
+      start:     document.getElementById('schedStart').value
     };
     FS.save('schedule', payload, cb);
   }
@@ -583,10 +583,12 @@ var safetyDash = (function () {
     var disBtn = document.getElementById('btnSchedDisable');
     if (!el) return;
     if (_schedEnabled && _schedEmails.length) {
-      var freq = document.getElementById('schedFreq');
-      var freqTxt = freq ? freq.options[freq.selectedIndex].text : 'Weekly';
+      var freqEl = document.getElementById('schedFreq');
+      var freqTxt = freqEl ? freqEl.options[freqEl.selectedIndex].text : 'Weekly';
+      var rangeEl = document.getElementById('schedDataRange');
+      var rangeTxt = rangeEl ? rangeEl.options[rangeEl.selectedIndex].text : '';
       el.className = 'sched-status on';
-      el.textContent = '✓ Active — report sends ' + freqTxt.toLowerCase() + ' to ' + _schedEmails.length + ' recipient' + (_schedEmails.length > 1 ? 's' : '');
+      el.textContent = '✓ Active — sends ' + freqTxt.toLowerCase() + (rangeTxt ? ' · data: ' + rangeTxt : '') + ' · ' + _schedEmails.length + ' recipient' + (_schedEmails.length > 1 ? 's' : '');
       if (disBtn) disBtn.style.display = '';
     } else {
       el.className = 'sched-status off';
@@ -603,6 +605,37 @@ var safetyDash = (function () {
     chip.setAttribute('data-email', email);
     chip.innerHTML = email + '<span class="schip-x" onclick="safetyDash.removeSchedChip(this)">&#x2715;</span>';
     wrap.insertBefore(chip, input);
+  }
+
+  /* ── First-run Setup Gate ── */
+  var _isFirstRun = false;
+  var _pendingFetchArgs = null;
+
+  function showSetupGate() {
+    _isFirstRun = true;
+    document.getElementById('tbl').innerHTML =
+      '<div class="box setup-gate">' +
+      '<div class="setup-gate-icon">&#9881;</div>' +
+      '<div class="setup-gate-title">Welcome — First-Time Setup Required</div>' +
+      '<div class="setup-gate-body">This Geotab database doesn\'t have a scoring configuration yet. ' +
+      'Please select your active rules in the <strong>Rules</strong> panel and configure weights in the <strong>Weights</strong> panel, ' +
+      'then save both before data will load.</div>' +
+      '<div class="setup-gate-actions">' +
+      '<button class="btn btn-apply" onclick="safetyDash.togglePanel(\'rules\')">&#10003; Open Rules</button>' +
+      '<button class="btn btn-apply" onclick="safetyDash.togglePanel(\'weights\')" style="margin-left:8px;">&#9881; Open Weights</button>' +
+      '</div>' +
+      '</div>';
+    renderRulesPanel();
+    renderWeightsPanel();
+  }
+
+  function completeSetupIfReady() {
+    if (!_isFirstRun) return;
+    var enabledRules = getEnabledRules();
+    if (!enabledRules.length) { toast('Select at least one rule before continuing', '#ef4444'); return false; }
+    var total = getTotalWeight();
+    if (total !== 100) { equalizeWeightsData(); }
+    return true;
   }
 
   /* ── Geotab Data Fetch ── */
@@ -629,16 +662,22 @@ var safetyDash = (function () {
       /* Load saved config from Firestore, then continue */
       FS.load('ruleConfig', function (err1, savedCfg) {
         FS.load('ruleWeights', function (err2, savedWts) {
+          var isFirstRun = !savedCfg && !savedWts;
           initRuleConfig(rules, savedCfg, savedWts);
-          doFetch(dmap, fromStr, toStr);
+          if (isFirstRun) {
+            showSetupGate();
+          } else {
+            doFetch(dmap, fromStr, toStr);
+          }
         });
       });
     }, function () {
       _api.call('Get', { typeName: 'Rule', resultsLimit: 1000 }, function (rules) {
         FS.load('ruleConfig', function (err1, savedCfg) {
           FS.load('ruleWeights', function (err2, savedWts) {
+            var isFirstRun = !savedCfg && !savedWts;
             initRuleConfig(rules || [], savedCfg, savedWts);
-            doFetch({}, fromStr, toStr);
+            if (isFirstRun) { showSetupGate(); } else { doFetch({}, fromStr, toStr); }
           });
         });
       }, function (e) { showBox(''); showErr('Error: ' + (e && e.message ? e.message : JSON.stringify(e))); });
@@ -803,9 +842,28 @@ var safetyDash = (function () {
     },
 
     saveRules: function () {
+      if (_isFirstRun && !completeSetupIfReady()) return;
       FS.save('ruleConfig', _ruleConfig, function (err) {
-        if (!err && _rawData.length) rebuildRows();
-        toast(err ? 'Save failed' : 'Rules saved and applied', err ? '#ef4444' : '#10b981');
+        if (!err) {
+          FS.save('ruleWeights', _ruleWeights, function (err2) {
+            if (!err2 && _isFirstRun) {
+              _isFirstRun = false;
+              toast('Setup complete — loading data…', '#10b981');
+              var now = new Date(), from = new Date(now);
+              from.setDate(from.getDate() - _days);
+              doFetch({}, from.toISOString(), now.toISOString());
+            } else if (!err2 && _rawData.length) {
+              rebuildRows();
+              toast('Rules saved and applied', '#10b981');
+            } else if (err2) {
+              toast('Save failed: ' + err2.message, '#ef4444');
+            } else {
+              toast('Rules saved and applied', '#10b981');
+            }
+          });
+        } else {
+          toast('Save failed: ' + err.message, '#ef4444');
+        }
       });
     },
 
@@ -827,10 +885,25 @@ var safetyDash = (function () {
     saveWeights: function () {
       var total = getTotalWeight();
       if (total !== 100) { equalizeWeightsData(); renderWeightsPanel(); }
+      if (_isFirstRun && !getEnabledRules().length) { toast('Enable at least one rule in the Rules panel first', '#ef4444'); return; }
       FS.save('ruleWeights', _ruleWeights, function (err) {
-        toast(err ? 'Could not save: ' + err.message : 'Weights saved to Firestore (total: ' + getTotalWeight() + '%)', err ? '#ef4444' : '#10b981');
+        if (!err) {
+          FS.save('ruleConfig', _ruleConfig, function (err2) {
+            if (!err2 && _isFirstRun) {
+              _isFirstRun = false;
+              toast('Setup complete — loading data…', '#10b981');
+              var now = new Date(), from = new Date(now);
+              from.setDate(from.getDate() - _days);
+              doFetch({}, from.toISOString(), now.toISOString());
+            } else {
+              toast(err2 ? 'Save failed: ' + err2.message : 'Weights saved (total: ' + getTotalWeight() + '%)', err2 ? '#ef4444' : '#10b981');
+              if (!err2 && _rawData.length) rebuildRows();
+            }
+          });
+        } else {
+          toast('Could not save: ' + err.message, '#ef4444');
+        }
       });
-      if (_rawData.length) rebuildRows();
     },
 
     resetWeights: function () {
@@ -900,11 +973,6 @@ var safetyDash = (function () {
       toast('Weights equalized to ' + Math.round(100 / n) + '% each', '#FF7B01');
     },
 
-    schedFreqChange: function () {
-      var freq = document.getElementById('schedFreq').value;
-      var dayField = document.getElementById('schedDayField');
-      if (dayField) dayField.style.display = (freq === 'daily') ? 'none' : '';
-    },
 
     schedChipKey: function (e) {
       if (e.key === 'Enter' || e.key === ',') {
@@ -940,7 +1008,9 @@ var safetyDash = (function () {
       saveScheduleData(function (err) {
         if (!err) {
           updateSchedStatus();
-          toast('Schedule saved to Firestore — report will send ' + document.getElementById('schedFreq').value, '#10b981');
+          var freqEl = document.getElementById('schedFreq');
+          var freqTxt = freqEl ? freqEl.options[freqEl.selectedIndex].text.toLowerCase() : 'weekly';
+          toast('Schedule saved — report will send ' + freqTxt, '#10b981');
         } else {
           toast('Save failed: ' + err.message, '#ef4444');
         }

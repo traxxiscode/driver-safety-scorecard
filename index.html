@@ -228,46 +228,34 @@
     </div>
     <div class="panel-desc">
       Automatically email the Driver Safety Scorecard as a CSV on a recurring schedule.
-      Schedule config is saved to Firestore — your AWS EC2 backend reads it to determine
-      which Geotab databases to query and which recipients to send reports to.
+      One schedule per Geotab database — config is saved to Firestore and read by your AWS EC2 backend.
+      The subject line is always <em>Driver Safety Scorecard Report</em>.
     </div>
 
     <div class="sched-grid">
       <div class="sched-field">
         <label>Frequency</label>
-        <select class="sched-sel" id="schedFreq" onchange="safetyDash.schedFreqChange()">
+        <select class="sched-sel" id="schedFreq">
           <option value="daily">Daily</option>
           <option value="weekly" selected>Weekly</option>
           <option value="biweekly">Every 2 Weeks</option>
           <option value="monthly">Monthly</option>
         </select>
       </div>
-      <div class="sched-field" id="schedDayField">
-        <label>Day of Week</label>
-        <select class="sched-sel" id="schedDay">
-          <option value="1">Monday</option>
-          <option value="2">Tuesday</option>
-          <option value="3">Wednesday</option>
-          <option value="4">Thursday</option>
-          <option value="5" selected>Friday</option>
-          <option value="6">Saturday</option>
-          <option value="0">Sunday</option>
+      <div class="sched-field">
+        <label>Report Data Range</label>
+        <select class="sched-sel" id="schedDataRange">
+          <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="this_week">This Week</option>
+          <option value="last_week" selected>Last Week</option>
+          <option value="this_month">This Month</option>
+          <option value="last_month">Last Month</option>
         </select>
       </div>
       <div class="sched-field">
         <label>Start Date</label>
         <input type="date" class="sched-input" id="schedStart"/>
-      </div>
-      <div class="sched-field">
-        <label>Report Time</label>
-        <select class="sched-sel" id="schedTime">
-          <option value="06:00">6:00 AM</option>
-          <option value="07:00">7:00 AM</option>
-          <option value="08:00" selected>8:00 AM</option>
-          <option value="09:00">9:00 AM</option>
-          <option value="12:00">12:00 PM</option>
-          <option value="17:00">5:00 PM</option>
-        </select>
       </div>
     </div>
 
@@ -277,15 +265,10 @@
         <input
           class="schip-input"
           id="schedChipInput"
-          placeholder="Add email, press Enter..."
+          placeholder="Add email, press Enter…"
           onkeydown="safetyDash.schedChipKey(event)"
         />
       </div>
-    </div>
-
-    <div class="sched-field" style="margin-bottom:16px;">
-      <label>Report Subject Line</label>
-      <input type="text" class="sched-input" id="schedSubject" value="Driver Safety Scorecard Report" placeholder="Email subject..."/>
     </div>
 
     <div class="sched-status" id="schedStatus"></div>
