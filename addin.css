@@ -196,12 +196,6 @@ body.has-grid {
 }
 .btn-save:hover { background: rgba(16,185,129,.2); border-color: #10b981; color: #10b981; }
 
-.btn-rules {
-  background: rgba(255,69,1,.1);
-  border: 1px solid rgba(255,69,1,.35);
-  color: var(--accent2);
-}
-.btn-rules:hover { background: rgba(255,69,1,.2); border-color: var(--accent2); color: var(--accent2); }
 
 .btn-apply {
   background: rgba(255,123,1,.12);

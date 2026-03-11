@@ -29,10 +29,19 @@ var FS = (function () {
         firebase.initializeApp(firebaseConfig);
       }
       _db = firebase.firestore();
-      _ready = true;
-      _queue.forEach(function (fn) { fn(); });
-      _queue = [];
-      setFsStatus('ok', 'Firestore connected');
+      /* Sign in anonymously so requests satisfy `request.auth != null` rules */
+      firebase.auth().signInAnonymously()
+        .then(function () {
+          _ready = true;
+          _queue.forEach(function (fn) { fn(); });
+          _queue = [];
+          setFsStatus('ok', 'Firestore connected');
+        })
+        .catch(function (e) {
+          setFsStatus('err', 'Auth error: ' + e.message);
+          console.error('[SafetyScorecard] Firebase auth failed:', e);
+        });
+      return; /* queue will be flushed after auth resolves */
     } catch (e) {
       setFsStatus('err', 'Firestore error: ' + e.message);
       console.error('[SafetyScorecard] Firestore init failed:', e);
@@ -40,7 +49,7 @@ var FS = (function () {
   }
 
   function docRef(field) {
-    return _db.collection('safety_config').doc(_dbId + '__' + field);
+    return _db.collection('driver_safety_scorecard').doc(_dbId + '__' + field);
   }
 
   function setFsStatus(state, label) {
