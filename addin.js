@@ -102,6 +102,7 @@ var safetyDash = (function () {
   var _allGroups = [], _selectedGroups = [], _driverGroups = {};
   var MAX_RULES = 6;
   var _schedEmails = [], _schedEnabled = false;
+  var _dmap = {};  // persisted so driver names survive the first-run setup gate
 
   /* ── Helpers ── */
   function setDateRange() {
@@ -645,6 +646,7 @@ var safetyDash = (function () {
       initGroups(groups);
       var dmap = {};
       users.forEach(function (u) { var dn = buildDriverName(u); if (dn && u.id) dmap[u.id] = dn; });
+      _dmap = dmap;
 
       /* Load saved config from Firestore, then continue */
       FS.load('ruleConfig', function (err1, savedCfg) {
@@ -664,7 +666,7 @@ var safetyDash = (function () {
           FS.load('ruleWeights', function (err2, savedWts) {
             var isFirstRun = !savedCfg && !savedWts;
             initRuleConfig(rules || [], savedCfg, savedWts);
-            if (isFirstRun) { showSetupGate(); } else { doFetch({}, fromStr, toStr); }
+            if (isFirstRun) { showSetupGate(); } else { doFetch(_dmap, fromStr, toStr); }
           });
         });
       }, function (e) { showBox(''); showErr('Error: ' + (e && e.message ? e.message : JSON.stringify(e))); });
@@ -838,7 +840,7 @@ var safetyDash = (function () {
               toast('Setup complete — loading data…', '#10b981');
               var now = new Date(), from = new Date(now);
               from.setDate(from.getDate() - _days);
-              doFetch({}, from.toISOString(), now.toISOString());
+              doFetch(_dmap, from.toISOString(), now.toISOString());
             } else if (!err2 && _rawData.length) {
               rebuildRows();
               toast('Rules saved and applied', '#10b981');
@@ -881,7 +883,7 @@ var safetyDash = (function () {
               toast('Setup complete — loading data…', '#10b981');
               var now = new Date(), from = new Date(now);
               from.setDate(from.getDate() - _days);
-              doFetch({}, from.toISOString(), now.toISOString());
+              doFetch(_dmap, from.toISOString(), now.toISOString());
             } else {
               toast(err2 ? 'Save failed: ' + err2.message : 'Weights saved (total: ' + getTotalWeight() + '%)', err2 ? '#ef4444' : '#10b981');
               if (!err2 && _rawData.length) rebuildRows();
