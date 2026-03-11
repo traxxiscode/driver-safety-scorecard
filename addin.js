@@ -29,19 +29,23 @@ var FS = (function () {
         firebase.initializeApp(firebaseConfig);
       }
       _db = firebase.firestore();
-      /* Sign in anonymously so requests satisfy `request.auth != null` rules */
+      /* Sign in anonymously so requests satisfy `request.auth != null` rules.
+         If anonymous auth isn't enabled in Firebase Console, we fall through
+         and attempt Firestore ops anyway (useful during development). */
       firebase.auth().signInAnonymously()
         .then(function () {
-          _ready = true;
-          _queue.forEach(function (fn) { fn(); });
-          _queue = [];
           setFsStatus('ok', 'Firestore connected');
         })
         .catch(function (e) {
-          setFsStatus('err', 'Auth error: ' + e.message);
-          console.error('[SafetyScorecard] Firebase auth failed:', e);
+          console.warn('[SafetyScorecard] Anonymous auth failed — enable it in Firebase Console > Authentication > Sign-in methods. Proceeding without auth.', e.message);
+          setFsStatus('warn', 'Firestore (no auth)');
+        })
+        .finally(function () {
+          _ready = true;
+          _queue.forEach(function (fn) { fn(); });
+          _queue = [];
         });
-      return; /* queue will be flushed after auth resolves */
+      return; /* queue will be flushed after auth resolves/rejects */
     } catch (e) {
       setFsStatus('err', 'Firestore error: ' + e.message);
       console.error('[SafetyScorecard] Firestore init failed:', e);
