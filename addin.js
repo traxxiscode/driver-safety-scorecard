@@ -1,6 +1,6 @@
 /* =========================================================
    Baseline Driver Safety Scorecard — addin.js
-   Firestore structure (mirrors hosAlert.py pattern):
+   Firestore structure:
      Collection : driver_safety_scorecard
      Doc fields : database_name, ruleConfig, ruleWeights,
                   schedule (emails, enabled, freq, dataRange,
@@ -8,40 +8,57 @@
    ========================================================= */
 
 /* ── Firebase / Firestore ───────────────────────────────── */
-var _db   = null;
-var _docRef = null;   // reference to this database's config doc
+var _db             = null;
+var _docRef         = null;   // reference to this database's config doc
 var _currentDatabase = null;
 
-function initFirestore(databaseName) {
+/**
+ * Initialize Firestore — called once we have the database name from the
+ * Geotab session.  Mirrors the HOS alerter: sign in anonymously, then
+ * look up (or create) the config document for this database.
+ */
+function initFirestore(databaseName, cb) {
   _currentDatabase = databaseName;
+
+  var config = {
+    apiKey:            'AIzaSyCOMWmaflsbq2rqulJK11mbf_zqNrPH2Qc',
+    authDomain:        'driver-safety-scorecard.firebaseapp.com',
+    projectId:         'driver-safety-scorecard',
+    storageBucket:     'driver-safety-scorecard.firebasestorage.app',
+    messagingSenderId: '256203757490',
+    appId:             '1:256203757490:web:27b0edc739a32b5bc7f6ab'
+  };
+
+  // Use the same multi-app-safe init pattern as the HOS alerter
   if (!firebase.apps.length) {
-    firebase.initializeApp({
-      apiKey:            "AIzaSyCOMWmaflsbq2rqulJK11mbf_zqNrPH2Qc",
-      authDomain:        "driver-safety-scorecard.firebaseapp.com",
-      projectId:         "driver-safety-scorecard",
-      storageBucket:     "driver-safety-scorecard.firebasestorage.app",
-      messagingSenderId: "256203757490",
-      appId:             "1:256203757490:web:27b0edc739a32b5bc7f6ab"
-    });
+    firebase.initializeApp(config);
   }
   _db = firebase.firestore();
 
-  firebase.auth().signInAnonymously().catch(function (e) {
-    console.warn('[Scorecard] Anonymous auth failed:', e.message);
+  // Anonymous auth — required for Firestore security rules
+  var authCheck = new Promise(function (resolve, reject) {
+    firebase.auth().onAuthStateChanged(function (user) {
+      if (user) {
+        resolve(user);
+      } else {
+        firebase.auth().signInAnonymously().then(resolve).catch(reject);
+      }
+    });
   });
-}
 
-/* Ensure a config doc exists for this database, then call cb(docRef) */
-function getOrCreateDoc(cb) {
-  _db.collection('driver_safety_scorecard')
-    .where('database_name', '==', _currentDatabase)
-    .get()
+  authCheck
+    .then(function () {
+      // Ensure a config document exists for this database
+      return _db.collection('driver_safety_scorecard')
+        .where('database_name', '==', _currentDatabase)
+        .get();
+    })
     .then(function (snap) {
       if (!snap.empty) {
         _docRef = snap.docs[0].ref;
-        cb(_docRef);
+        console.log('[Scorecard] Config doc found for', _currentDatabase);
       } else {
-        _db.collection('driver_safety_scorecard').add({
+        return _db.collection('driver_safety_scorecard').add({
           database_name: _currentDatabase,
           ruleConfig:    {},
           ruleWeights:   {},
@@ -50,30 +67,39 @@ function getOrCreateDoc(cb) {
           updated_at:    firebase.firestore.FieldValue.serverTimestamp()
         }).then(function (ref) {
           _docRef = ref;
-          cb(ref);
-        }).catch(function (e) { console.error('[Scorecard] Doc create failed:', e); });
+          console.log('[Scorecard] Created new config doc for', _currentDatabase);
+        });
       }
     })
-    .catch(function (e) { console.error('[Scorecard] Doc lookup failed:', e); });
-}
-
-function fsLoad(cb) {
-  getOrCreateDoc(function (ref) {
-    ref.get().then(function (snap) {
-      cb(snap.exists ? snap.data() : {});
-    }).catch(function (e) { console.error('[Scorecard] Load failed:', e); cb({}); });
-  });
-}
-
-function fsSave(fields, cb) {
-  getOrCreateDoc(function (ref) {
-    var payload = Object.assign({}, fields, {
-      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+    .then(function () {
+      if (typeof cb === 'function') cb(null);
+    })
+    .catch(function (e) {
+      console.error('[Scorecard] Firestore init failed:', e);
+      if (typeof cb === 'function') cb(e);
     });
-    ref.update(payload)
-      .then(function () { if (typeof cb === 'function') cb(null); })
-      .catch(function (e) { console.error('[Scorecard] Save failed:', e); if (typeof cb === 'function') cb(e); });
+}
+
+/* Load the config doc and pass its data to cb(data) */
+function fsLoad(cb) {
+  if (!_docRef) { cb({}); return; }
+  _docRef.get()
+    .then(function (snap) { cb(snap.exists ? snap.data() : {}); })
+    .catch(function (e)   { console.error('[Scorecard] Load failed:', e); cb({}); });
+}
+
+/* Merge-update the config doc with the provided fields */
+function fsSave(fields, cb) {
+  if (!_docRef) {
+    if (typeof cb === 'function') cb(new Error('No Firestore doc reference'));
+    return;
+  }
+  var payload = Object.assign({}, fields, {
+    updated_at: firebase.firestore.FieldValue.serverTimestamp()
   });
+  _docRef.update(payload)
+    .then(function ()  { if (typeof cb === 'function') cb(null); })
+    .catch(function (e) { console.error('[Scorecard] Save failed:', e); if (typeof cb === 'function') cb(e); });
 }
 
 /* ── Main Dashboard ─────────────────────────────────────── */
@@ -208,10 +234,10 @@ var safetyDash = (function () {
     if (!enabled.length) return 100;
     var totalDeduction = 0;
     enabled.forEach(function (rid) {
-      var cnt    = ebr[rid] || 0;
-      var wt     = getWeight(rid);
+      var cnt      = ebr[rid] || 0;
+      var wt       = getWeight(rid);
       var perEvent = (_ruleConfig[rid] && _ruleConfig[rid].perEvent) || 3;
-      var rate   = (cnt / norm) * 100;
+      var rate     = (cnt / norm) * 100;
       totalDeduction += Math.min(wt, rate * perEvent);
     });
     return Math.max(0, Math.round(100 - totalDeduction));
@@ -290,9 +316,9 @@ var safetyDash = (function () {
   }
 
   function updateBadge() {
-    var badge   = document.getElementById('filterBadge');
-    var topCard = document.getElementById('kpi-top');
-    var riskCard= document.getElementById('kpi-risk');
+    var badge    = document.getElementById('filterBadge');
+    var topCard  = document.getElementById('kpi-top');
+    var riskCard = document.getElementById('kpi-risk');
     topCard.classList.remove('kpi-active','kpi-active-green');
     riskCard.classList.remove('kpi-active','kpi-active-red');
     if (!_groupFilter) { badge.style.display = 'none'; return; }
@@ -620,6 +646,7 @@ var safetyDash = (function () {
         }
       });
     }, function () {
+      // multiCall fallback — try with just rules
       _api.call('Get', { typeName: 'Rule', resultsLimit: 1000 }, function (rules) {
         fsLoad(function (data) {
           var savedCfg = data.ruleConfig  || null;
@@ -682,23 +709,33 @@ var safetyDash = (function () {
 
   /* ── Public API ── */
   return {
+
+    /**
+     * Called once we have both the api reference and the confirmed database
+     * name from the Geotab session (done inside the focus lifecycle method).
+     */
     init: function (api, databaseName) {
       _api = api;
       setDateRange();
       document.getElementById('btnRefresh').onclick = fetchData;
       document.getElementById('schedStart').value = new Date().toISOString().split('T')[0];
 
-      initFirestore(databaseName);
-
-      /* Load theme + schedule from Firestore */
-      fsLoad(function (data) {
-        if (data.preferences && data.preferences.theme === 'light') {
-          _isLight = true;
-          document.body.classList.add('light');
-          document.getElementById('themeLbl').textContent = 'LIGHT';
-          updateLogos(true);
+      // Initialise Firestore (auth + ensure doc), then load theme/schedule
+      initFirestore(databaseName, function (err) {
+        if (err) {
+          showBox('');
+          showErr('Could not connect to configuration service: ' + err.message);
+          return;
         }
-        loadScheduleUI(data.schedule || null);
+        fsLoad(function (data) {
+          if (data.preferences && data.preferences.theme === 'light') {
+            _isLight = true;
+            document.body.classList.add('light');
+            document.getElementById('themeLbl').textContent = 'LIGHT';
+            updateLogos(true);
+          }
+          loadScheduleUI(data.schedule || null);
+        });
       });
     },
 
@@ -897,12 +934,12 @@ var safetyDash = (function () {
       _schedEnabled = true;
       fsSave({
         schedule: {
-          emails:       _schedEmails,
-          enabled:      true,
-          freq:         document.getElementById('schedFreq').value,
-          dataRange:    document.getElementById('schedDataRange').value,
-          time:         document.getElementById('schedTime').value,
-          start:        document.getElementById('schedStart').value,
+          emails:        _schedEmails,
+          enabled:       true,
+          freq:          document.getElementById('schedFreq').value,
+          dataRange:     document.getElementById('schedDataRange').value,
+          time:          document.getElementById('schedTime').value,
+          start:         document.getElementById('schedStart').value,
           database_name: _currentDatabase
         }
       }, function (err) {
@@ -919,9 +956,14 @@ var safetyDash = (function () {
 
     disableSchedule: function () {
       _schedEnabled = false;
-      fsSave({ 'schedule.enabled': false }, function () {
-        updateSchedStatus();
-        toast('Schedule disabled', '#64748b');
+      // Pass the full schedule object with enabled:false — Firestore dot-notation
+      // path strings don't work reliably with the compat SDK's update().
+      fsLoad(function (data) {
+        var existing = data.schedule || {};
+        fsSave({ schedule: Object.assign({}, existing, { enabled: false }) }, function () {
+          updateSchedStatus();
+          toast('Schedule disabled', '#64748b');
+        });
       });
     },
 
@@ -958,18 +1000,41 @@ function updateLogos(isLight) {
   document.querySelectorAll('.hdr-logo').forEach(function (img) { img.src = isLight ? lightLogo : darkLogo; });
 }
 
-/* ── Geotab addin entry point ───────────────────────────── */
+/* ── Geotab add-in entry point ───────────────────────────── */
 geotab.addin = geotab.addin || {};
 geotab.addin.safetyscorecard = function () {
+  var _api   = null;
+  var _state = null;
+
   return {
-    initialize: function (api, state, cb) {
-      // Use api.getSession() to get the real database name — same pattern as HOS alerter
-      api.getSession(function (session) {
-        safetyDash.init(api, session.database);
-      });
-      if (typeof cb === 'function') cb();
+    /**
+     * initialize — store references, call the callback immediately.
+     * Do NOT call api.getSession() here; the session isn't guaranteed
+     * to be fully ready until focus() fires.  Matches the HOS alerter
+     * pattern exactly.
+     */
+    initialize: function (freshApi, freshState, initializeCallback) {
+      _api   = freshApi;
+      _state = freshState;
+      if (typeof initializeCallback === 'function') initializeCallback();
     },
-    focus: function () { safetyDash.fetch(); },
-    blur:  function () {}
+
+    /**
+     * focus — called every time the user navigates to this add-in.
+     * This is the correct place to call api.getSession() and kick off
+     * Firestore + data loading, mirroring the HOS alerter's focus().
+     */
+    focus: function (freshApi, freshState) {
+      _api   = freshApi;
+      _state = freshState;
+
+      // getSession provides the real authenticated database name
+      _api.getSession(function (session) {
+        safetyDash.init(_api, session.database);
+        safetyDash.fetch();
+      });
+    },
+
+    blur: function () {}
   };
 };
