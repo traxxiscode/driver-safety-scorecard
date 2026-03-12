@@ -1,400 +1,157 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Baseline Driver Safety Scorecard</title>
-  <link rel="stylesheet" href="addin.css"/>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HOS Availability Alert Emailer</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="addin.css" rel="stylesheet">
 
-  <!--
-    Firebase SDK — required for Firestore storage.
-    Pin to the same minor version you use in your project.
-    Replace with your actual Firebase SDK imports if using
-    the modular v9+ API (update safety.js accordingly).
-  -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+    <script src="addin.js"></script>
 </head>
-<body class="has-grid">
+<body>
+<div id="hosAlerter" style="display: none;">
 
-<div id="app">
-
-  <!-- ── Header ─────────────────────────────────────────── -->
-  <div class="hdr">
-    <div class="hdr-brand">
-      <img
-        class="hdr-logo"
-        src="https://cdn.baseline.is/static/content/logos/mDtvptChQ3XwBLuxuu5hip-lala.svg"
-        alt="Baseline"
-      />
-      <div class="hdr-divider"></div>
-      <div class="hdr-title">
-        <h1>Driver Safety Scorecard</h1>
-        <p class="date-range" id="dateRange"></p>
-      </div>
-    </div>
-
-    <div class="hdr-right">
-      <!-- Date range buttons -->
-      <div class="range-group">
-        <button class="range-btn"        onclick="safetyDash.setRange(7)">7D</button>
-        <button class="range-btn active" onclick="safetyDash.setRange(30)">30D</button>
-        <button class="range-btn"        onclick="safetyDash.setRange(60)">60D</button>
-        <button class="range-btn"        onclick="safetyDash.setRange(90)">90D</button>
-      </div>
-
-      <!-- Theme toggle -->
-      <div class="toggle-wrap" onclick="safetyDash.toggleTheme()">
-        <div class="toggle-track"><div class="toggle-thumb"></div></div>
-        <span class="toggle-lbl" id="themeLbl">DARK</span>
-      </div>
-
-      <!-- Action buttons -->
-      <button class="btn" id="btnInfo" onclick="safetyDash.toggleInfo()" title="How scoring works">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="12" y1="16" x2="12" y2="12"/>
-          <line x1="12" y1="8" x2="12.01" y2="8"/>
-        </svg>
-        How It Works
-      </button>
-
-      <button class="btn" id="btnSchedule" onclick="safetyDash.togglePanel('schedule')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="4" width="18" height="18" rx="2"/>
-          <line x1="16" y1="2" x2="16" y2="6"/>
-          <line x1="8"  y1="2" x2="8"  y2="6"/>
-          <line x1="3"  y1="10" x2="21" y2="10"/>
-        </svg>
-        Schedule Report
-      </button>
-
-      <button class="btn" id="btnWeights" onclick="safetyDash.togglePanel('weights')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-        Weights
-      </button>
-
-      <button class="btn btn-rules" id="btnRules" onclick="safetyDash.togglePanel('rules')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 11l3 3L22 4"/>
-          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-        </svg>
-        Rules
-      </button>
-
-      <button class="btn" id="btnRefresh">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-          <path d="M21 3v5h-5"/>
-          <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-          <path d="M8 16H3v5"/>
-        </svg>
-        Refresh
-      </button>
-    </div>
-  </div><!-- /.hdr -->
-
-  <!-- ── KPI Cards ───────────────────────────────────────── -->
-  <div class="kpis">
-    <div class="kpi" id="kpi-avg">
-      <div class="kpi-top-bar" style="background:var(--accent);"></div>
-      <div class="kpi-lbl">Fleet Avg Score</div>
-      <div class="kpi-val" id="k1" style="color:var(--accent);">&#8212;</div>
-      <div class="kpi-sub">out of 100</div>
-    </div>
-
-    <div class="kpi clickable" id="kpi-top" onclick="safetyDash.filterGroup('top')">
-      <div class="kpi-top-bar" style="background:#10b981;"></div>
-      <div class="kpi-lbl">Top Performers</div>
-      <div class="kpi-val" id="k2" style="color:#10b981;">&#8212;</div>
-      <div class="kpi-sub">score &#8805; 80</div>
-      <div class="kpi-hint">&#9654; Click to filter</div>
-    </div>
-
-    <div class="kpi clickable" id="kpi-risk" onclick="safetyDash.filterGroup('risk')">
-      <div class="kpi-top-bar" style="background:#ef4444;"></div>
-      <div class="kpi-lbl">At-Risk Drivers</div>
-      <div class="kpi-val" id="k3" style="color:#ef4444;">&#8212;</div>
-      <div class="kpi-sub">score &lt; 60</div>
-      <div class="kpi-hint">&#9654; Click to filter</div>
-    </div>
-
-    <div class="kpi" id="kpi-spd">
-      <div class="kpi-top-bar" style="background:var(--kpi-speeding);"></div>
-      <div class="kpi-lbl">Total Speeding</div>
-      <div class="kpi-val" id="k4" style="color:var(--kpi-speeding);">&#8212;</div>
-      <div class="kpi-sub">events in period</div>
-    </div>
-
-    <div class="kpi" id="kpi-brk">
-      <div class="kpi-top-bar" style="background:var(--kpi-braking);"></div>
-      <div class="kpi-lbl">Hard Braking</div>
-      <div class="kpi-val" id="k5" style="color:var(--kpi-braking);">&#8212;</div>
-      <div class="kpi-sub">events in period</div>
-    </div>
-
-    <div class="kpi" id="kpi-drv">
-      <div class="kpi-top-bar" style="background:var(--kpi-drivers);"></div>
-      <div class="kpi-lbl">Drivers Tracked</div>
-      <div class="kpi-val" id="k6" style="color:var(--kpi-drivers);">&#8212;</div>
-      <div class="kpi-sub" id="k4sub">total fleet miles</div>
-    </div>
-  </div><!-- /.kpis -->
-
-  <!-- ── Weights Panel ───────────────────────────────────── -->
-  <div class="panel" id="panelWeights">
-    <div class="panel-header">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div class="panel-title">&#9881; Score Weight Configuration</div>
-        <div class="wt-tooltip">
-          <div class="wt-tooltip-icon">?</div>
-          <div class="wt-tooltip-popup">
-            Weights must total exactly 100. Each rule's weight is its share of the total score penalty.
-            Equal distribution is set automatically when rules change. You can override values —
-            the remaining weight redistributes proportionally.
-          </div>
-        </div>
-      </div>
-      <span class="panel-count" id="weightsCount"></span>
-    </div>
-    <div class="panel-desc">Each weight is a percentage of the total score (must sum to 100). Higher weight = bigger impact. Rules are auto-equalized when added or removed.</div>
-
-    <div class="wt-total-bar">
-      <span class="wt-total-label">Total Weight</span>
-      <span class="wt-total-num wt-total-ok" id="wtTotalNum">100</span>
-      <div class="wt-total-track">
-        <div class="wt-total-fill" id="wtTotalFill" style="width:100%;background:#10b981;"></div>
-      </div>
-      <span class="wt-total-hint" id="wtTotalHint">&#10003; Balanced</span>
-      <button class="weight-eq-btn" onclick="safetyDash.equalizeWeights()">&#8776; Auto-equalize</button>
-    </div>
-
-    <div class="weight-grid" id="weightGrid">
-      <div class="weight-empty">Load data first to see weights.</div>
-    </div>
-
-    <div class="panel-footer">
-      <button class="btn" onclick="safetyDash.resetWeights()">Reset to Default</button>
-      <button class="btn btn-apply" onclick="safetyDash.saveWeights()">Save &amp; Apply</button>
-    </div>
-  </div><!-- /#panelWeights -->
-
-  <!-- ── Rules Panel ─────────────────────────────────────── -->
-  <div class="panel" id="panelRules">
-    <div class="panel-header">
-      <div class="panel-title">&#10003; Rule Configuration</div>
-      <span class="panel-count" id="ruleCount"></span>
-    </div>
-    <div class="panel-desc">Toggle which exception rules affect driver scores. Maximum 6 rules active at once. Custom rules appear under Uncategorized.</div>
-    <div class="rule-limit-warn" id="ruleLimitWarn">Maximum 6 rules selected. Disable a rule before enabling another.</div>
-    <div id="rulesList">
-      <div class="box"><div class="msg-txt">Load data first to see available rules.</div></div>
-    </div>
-    <div class="panel-footer">
-      <span class="panel-count" id="rulesEnabled"></span>
-      <button class="btn" onclick="safetyDash.resetRules()" style="margin-left:auto;">Reset Rules</button>
-      <button class="btn btn-apply" onclick="safetyDash.saveRules()">Save &amp; Apply</button>
-    </div>
-  </div><!-- /#panelRules -->
-
-  <!-- ── Schedule Panel ─────────────────────────────────── -->
-  <div class="panel" id="panelSchedule">
-    <div class="panel-header">
-      <div class="panel-title">&#128197; Schedule Email Report</div>
-      <span class="panel-count" id="schedCount"></span>
-    </div>
-    <div class="panel-desc">
-      Automatically email the Driver Safety Scorecard as a CSV on a recurring schedule.
-      The subject line is always <em>Driver Safety Scorecard Report</em>.
-    </div>
-
-    <div class="sched-grid">
-      <div class="sched-field">
-        <label>Frequency</label>
-        <select class="sched-sel" id="schedFreq">
-          <option value="daily">Daily</option>
-          <option value="weekly" selected>Weekly</option>
-          <option value="biweekly">Every 2 Weeks</option>
-          <option value="monthly">Monthly</option>
-        </select>
-      </div>
-      <div class="sched-field">
-        <label>Report Data Range</label>
-        <select class="sched-sel" id="schedDataRange">
-          <option value="today">Today</option>
-          <option value="yesterday">Yesterday</option>
-          <option value="this_week">This Week</option>
-          <option value="last_week" selected>Last Week</option>
-          <option value="this_month">This Month</option>
-          <option value="last_month">Last Month</option>
-        </select>
-      </div>
-      <div class="sched-field">
-        <label>Start Date</label>
-        <input type="date" class="sched-input" id="schedStart"/>
-      </div>
-      <div class="sched-field">
-        <label>Start Time (ET)</label>
-        <select class="sched-sel" id="schedTime">
-          <option value="00:00">12:00 AM</option>
-          <option value="01:00">1:00 AM</option>
-          <option value="02:00">2:00 AM</option>
-          <option value="03:00">3:00 AM</option>
-          <option value="04:00">4:00 AM</option>
-          <option value="05:00">5:00 AM</option>
-          <option value="06:00">6:00 AM</option>
-          <option value="07:00">7:00 AM</option>
-          <option value="08:00" selected>8:00 AM</option>
-          <option value="09:00">9:00 AM</option>
-          <option value="10:00">10:00 AM</option>
-          <option value="11:00">11:00 AM</option>
-          <option value="12:00">12:00 PM</option>
-          <option value="13:00">1:00 PM</option>
-          <option value="14:00">2:00 PM</option>
-          <option value="15:00">3:00 PM</option>
-          <option value="16:00">4:00 PM</option>
-          <option value="17:00">5:00 PM</option>
-          <option value="18:00">6:00 PM</option>
-          <option value="19:00">7:00 PM</option>
-          <option value="20:00">8:00 PM</option>
-          <option value="21:00">9:00 PM</option>
-          <option value="22:00">10:00 PM</option>
-          <option value="23:00">11:00 PM</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="sched-emails-wrap" style="margin-bottom:16px;">
-      <label>Recipients</label>
-      <div class="sched-chips" id="schedChips" onclick="document.getElementById('schedChipInput').focus()">
-        <input
-          class="schip-input"
-          id="schedChipInput"
-          placeholder="Add email, press Enter…"
-          onkeydown="safetyDash.schedChipKey(event)"
-        />
-      </div>
-    </div>
-
-    <div class="sched-status" id="schedStatus"></div>
-
-    <div class="panel-footer">
-      <button class="btn" onclick="safetyDash.togglePanel('schedule')">Cancel</button>
-      <button class="btn" id="btnSchedDisable" onclick="safetyDash.disableSchedule()" style="display:none;">Disable Schedule</button>
-      <button class="btn btn-apply" onclick="safetyDash.saveSchedule()">Save Schedule</button>
-    </div>
-  </div><!-- /#panelSchedule -->
-
-  <!-- ── Info Modal ──────────────────────────────────────── -->
-  <div class="modal-overlay" id="infoModal" onclick="if(event.target===this)safetyDash.toggleInfo()">
-    <div class="modal">
-      <div class="modal-hdr">
-        <span class="modal-title">&#9432;&nbsp; How Driver Scoring Works</span>
-        <span class="modal-close" onclick="safetyDash.toggleInfo()">&#x2715;</span>
-      </div>
-
-      <div class="modal-section">
-        <div class="modal-section-title">Score Formula</div>
-        <div class="modal-body">Every driver starts with a perfect score of 100. Points are deducted for each safety rule violation, scaled by miles driven in the period.</div>
-        <div class="modal-formula">
-          <strong>Score = 100 &minus; &sum; Rule Deductions</strong><br/>
-          <strong>Rule Deduction</strong> = min( Weight, Rate &times; Points/Incident )<br/>
-          <strong>Rate</strong> = Events &divide; Miles Driven &times; 100
-        </div>
-        <div class="modal-body">Scoring is normalized per 100 miles driven so high-mileage drivers aren't unfairly penalized for volume.</div>
-      </div>
-
-      <div class="modal-section">
-        <div class="modal-section-title">Weights</div>
-        <div class="modal-body">Each enabled rule has a <strong>Weight</strong> (0–100) representing its share of total score impact. All weights must sum to exactly 100. When rules change, weights are auto-equalized.</div>
-      </div>
-
-      <div class="modal-section">
-        <div class="modal-section-title">Points Per Incident</div>
-        <div class="modal-body">Set per rule in the Rules panel. Controls how many raw penalty points each event generates before the weight cap applies. Higher = more sensitive to individual incidents.</div>
-      </div>
-
-      <div class="modal-section">
-        <div class="modal-section-title">Grade Scale</div>
-        <div class="modal-grade-grid">
-          <div class="modal-grade-item"><span class="grade grade-a">A</span><span class="modal-grade-range">90–100</span></div>
-          <div class="modal-grade-item"><span class="grade grade-b">B</span><span class="modal-grade-range">80–89</span></div>
-          <div class="modal-grade-item"><span class="grade grade-c">C</span><span class="modal-grade-range">70–79</span></div>
-          <div class="modal-grade-item"><span class="grade grade-d">D</span><span class="modal-grade-range">60–69</span></div>
-          <div class="modal-grade-item"><span class="grade grade-f">F</span><span class="modal-grade-range">0–59</span></div>
-        </div>
-      </div>
-
-      <div class="modal-section">
-        <div class="modal-section-title">Data Access &amp; Security</div>
-        <div class="modal-body">
-          This add-in uses the authenticated Geotab API session. All driver, vehicle, and exception data is scoped to the logged-in user's group visibility in Geotab.
-        </div>
-      </div>
-    </div>
-  </div><!-- /#infoModal -->
-
-  <!-- ── Scorecard Table ─────────────────────────────────── -->
-  <div class="sec-hdr">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <span class="sec-ttl">Driver Scorecard</span>
-      <div id="filterBadge" style="display:none;"></div>
-    </div>
-    <div class="sec-right">
-      <input type="text" class="srch" id="srch" placeholder="Search driver…" oninput="safetyDash.filter()"/>
-      <div class="grp-wrap" id="grpWrap">
-        <button class="grp-btn" id="grpBtn" onclick="safetyDash.toggleGroupDrop()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            <path d="M21 21v-2a4 4 0 0 0-3-3.85"/>
-          </svg>
-          Groups<span class="grp-badge" id="grpBadge" style="display:none">0</span>
+    <!-- Header action -->
+    <div data-suite-actions style="display:none;">
+        <button class="btn btn-header-action" onclick="hosAlerterRefresh()">
+            <i class="fas fa-sync-alt"></i>
+            <span class="btn-label">Refresh</span>
         </button>
-        <div class="grp-dropdown" id="grpDropdown">
-          <div class="grp-item" id="grpAll" onclick="safetyDash.selectAllGroups()">
-            <div class="grp-chk"><svg viewBox="0 0 12 10" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="1,5 4.5,8.5 11,1"/></svg></div>
-            <span>All Groups</span>
-          </div>
-          <hr class="grp-divider"/>
-          <div id="grpList"></div>
-          <hr class="grp-divider"/>
-          <span class="grp-clear" onclick="safetyDash.clearGroupFilter()">Clear filter</span>
+    </div>
+
+    <!-- Alerts -->
+    <div id="alertContainer" class="container mt-3"></div>
+
+    <!-- Loading overlay -->
+    <div id="initialLoadingOverlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner-border text-primary" role="status" style="width:3rem;height:3rem;">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <div class="mt-3 h5">Loading...</div>
         </div>
-      </div>
-      <button class="btn" onclick="safetyDash.exportCSV()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-        Export CSV
-      </button>
     </div>
-  </div>
 
-  <div id="errBox"></div>
-  <div id="warnBox"></div>
+    <div class="container mt-4">
+        <div class="row">
 
-  <div class="tbl-wrap">
-    <div id="tbl">
-      <div class="box">
-        <div class="spinner"></div>
-        <div class="msg-txt">WAITING FOR GEOTAB…</div>
-      </div>
+            <!-- Add Recipient -->
+            <div class="col-lg-6 mb-4">
+                <div class="card enhanced-card">
+                    <div class="card-header">
+                        <i class="fas fa-plus-circle me-2"></i>Add Email Recipients
+                    </div>
+                    <div class="card-body">
+                        <form id="addRecipientForm">
+                            <div class="mb-4">
+                                <label for="recipientEmail" class="form-label">Email Address</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                    <input type="email" class="form-control" id="recipientEmail"
+                                           placeholder="user@example.com" required>
+                                </div>
+                                <div class="form-text">
+                                    This address will receive HOS alerts every 30 minutes when drivers are near their limits.
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-loading" id="addRecipientBtn">
+                                <span class="btn-text"><i class="fas fa-plus me-2"></i>Add Recipient</span>
+                                <span class="btn-loading-text" style="display:none;">
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    Adding...
+                                </span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recipients List -->
+            <div class="col-lg-6 mb-4">
+                <div class="card enhanced-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>
+                            <i class="fas fa-users me-2"></i>Current Recipients
+                            <span id="recipientCount" class="badge custom-badge ms-2">0</span>
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div id="recipientsList">
+                            <div class="list-loading text-center py-4 text-muted">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <div class="mt-2">Loading...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Info -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card enhanced-card">
+                    <div class="card-header">
+                        <i class="fas fa-info-circle me-2"></i>Service Status &amp; Information
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="status-item">
+                                    <h6 class="status-label">Current Database:</h6>
+                                    <p id="currentDatabase" class="status-value">
+                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading...
+                                    </p>
+                                </div>
+                                <div class="status-item">
+                                    <h6 class="status-label">Service Status:</h6>
+                                    <p class="status-value">
+                                        <i class="fas fa-circle text-success pulse-animation me-2"></i>
+                                        <span class="text-success fw-bold">Active &amp; Running</span>
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="status-label">Alert Thresholds:</h6>
+                                <div class="feature-list">
+                                    <div class="feature-item">
+                                        <i class="fas fa-car text-primary me-2"></i>
+                                        Driving availability &le; 30 min remaining
+                                    </div>
+                                    <div class="feature-item">
+                                        <i class="fas fa-briefcase text-primary me-2"></i>
+                                        On-duty availability &le; 30 min remaining
+                                    </div>
+                                    <div class="feature-item">
+                                        <i class="fas fa-bed text-primary me-2"></i>
+                                        Rest availability &le; 15 min remaining
+                                    </div>
+                                    <div class="feature-item">
+                                        <i class="fas fa-redo text-primary me-2"></i>
+                                        Weekly cycle availability &le; 60 min remaining
+                                    </div>
+                                    <div class="feature-item">
+                                        <i class="fas fa-clock text-primary me-2"></i>
+                                        Checks run every 30 minutes automatically
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <div class="foot" id="foot"></div>
-</div><!-- /#app -->
+</div><!-- /#hosAlerter -->
 
-<div class="toast" id="toast"></div>
-
-<script src="addin.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
