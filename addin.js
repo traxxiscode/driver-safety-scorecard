@@ -767,6 +767,7 @@ var safetyDash = (function () {
     togglePanel: function (which) {
       var ids  = { weights: 'panelWeights', rules: 'panelRules', schedule: 'panelSchedule' };
       var btns = { weights: 'btnWeights',   rules: 'btnRules',   schedule: 'btnSchedule' };
+      var anyOpen = false;
       Object.keys(ids).forEach(function (k) {
         if (k === which) {
           var isOpen = document.getElementById(ids[k]).classList.toggle('open');
@@ -776,11 +777,25 @@ var safetyDash = (function () {
           if (isOpen && k === 'schedule') {
             fsLoad(function (data) { loadScheduleUI(data.schedule || null); });
           }
+          if (isOpen) anyOpen = true;
         } else {
           document.getElementById(ids[k]).classList.remove('open');
           if (btns[k] && document.getElementById(btns[k])) document.getElementById(btns[k]).classList.remove('active-btn');
         }
       });
+      var overlay = document.getElementById('panelOverlay');
+      if (overlay) overlay.classList.toggle('active', anyOpen);
+    },
+
+    closePanels: function () {
+      var ids  = { weights: 'panelWeights', rules: 'panelRules', schedule: 'panelSchedule' };
+      var btns = { weights: 'btnWeights',   rules: 'btnRules',   schedule: 'btnSchedule' };
+      Object.keys(ids).forEach(function (k) {
+        document.getElementById(ids[k]).classList.remove('open');
+        if (btns[k] && document.getElementById(btns[k])) document.getElementById(btns[k]).classList.remove('active-btn');
+      });
+      var overlay = document.getElementById('panelOverlay');
+      if (overlay) overlay.classList.remove('active');
     },
 
     toggleRule: function (rid) {
@@ -963,14 +978,17 @@ var safetyDash = (function () {
 
     disableSchedule: function () {
       _schedEnabled = false;
-      // Pass the full schedule object with enabled:false — Firestore dot-notation
-      // path strings don't work reliably with the compat SDK's update().
-      fsLoad(function (data) {
-        var existing = data.schedule || {};
-        fsSave({ schedule: Object.assign({}, existing, { enabled: false }) }, function () {
-          updateSchedStatus();
-          toast('Schedule disabled', '#64748b');
-        });
+      // Delete the schedule field entirely so the backend won't pick it up.
+      if (!_docRef) return;
+      _docRef.update({
+        schedule:   firebase.firestore.FieldValue.delete(),
+        updated_at: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(function () {
+        updateSchedStatus();
+        toast('Schedule removed — emails will no longer be sent', '#64748b');
+      }).catch(function (e) {
+        console.error('[Scorecard] disableSchedule failed:', e);
+        toast('Failed to remove schedule', '#ef4444');
       });
     },
 
