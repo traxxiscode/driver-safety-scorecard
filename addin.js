@@ -639,7 +639,10 @@ var safetyDash = (function () {
         var savedCfg = data.ruleConfig  || null;
         var savedWts = data.ruleWeights || null;
         initRuleConfig(rules, savedCfg, savedWts);
-        if (!savedCfg && !savedWts) {
+        // Treat an empty ruleConfig ({} with no enabled rules) the same as
+        // no config — the doc is freshly created but never actually configured.
+        var hasConfig = savedCfg && Object.keys(savedCfg).some(function (k) { return savedCfg[k] && savedCfg[k].enabled; });
+        if (!hasConfig) {
           showSetupGate();
         } else {
           doFetch(dmap, fromStr, toStr);
@@ -652,7 +655,8 @@ var safetyDash = (function () {
           var savedCfg = data.ruleConfig  || null;
           var savedWts = data.ruleWeights || null;
           initRuleConfig(rules || [], savedCfg, savedWts);
-          if (!savedCfg && !savedWts) { showSetupGate(); } else { doFetch(_dmap, fromStr, toStr); }
+          var hasConfig = savedCfg && Object.keys(savedCfg).some(function (k) { return savedCfg[k] && savedCfg[k].enabled; });
+          if (!hasConfig) { showSetupGate(); } else { doFetch(_dmap, fromStr, toStr); }
         });
       }, function (e) { showBox(''); showErr('Error: ' + (e && e.message ? e.message : JSON.stringify(e))); });
     });
@@ -720,7 +724,9 @@ var safetyDash = (function () {
       document.getElementById('btnRefresh').onclick = fetchData;
       document.getElementById('schedStart').value = new Date().toISOString().split('T')[0];
 
-      // Initialise Firestore (auth + ensure doc), then load theme/schedule
+      // Initialise Firestore (auth + ensure doc), then load theme/schedule,
+      // then kick off the data fetch — all in sequence so _docRef is set
+      // before fsLoad is ever called.
       initFirestore(databaseName, function (err) {
         if (err) {
           showBox('');
@@ -735,6 +741,7 @@ var safetyDash = (function () {
             updateLogos(true);
           }
           loadScheduleUI(data.schedule || null);
+          fetchData();
         });
       });
     },
@@ -1028,10 +1035,11 @@ geotab.addin.safetyscorecard = function () {
       _api   = freshApi;
       _state = freshState;
 
-      // getSession provides the real authenticated database name
+      // getSession provides the real authenticated database name.
+      // fetch() is triggered inside init() after Firestore is ready —
+      // do NOT call it here or it races against initFirestore completing.
       _api.getSession(function (session) {
         safetyDash.init(_api, session.database);
-        safetyDash.fetch();
       });
     },
 
