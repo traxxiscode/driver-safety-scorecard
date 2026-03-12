@@ -18,12 +18,14 @@
 var FS = (function () {
   var _db = null;
   var _dbId = 'default';   // set by init() from Geotab state
+  var _rawDbName = 'default'; // original database name before sanitisation
   var _ready = false;
   var _queue = [];
 
   /* Call this once with your Firebase config object */
   function configure(firebaseConfig, geotabDatabaseName) {
-    _dbId = (geotabDatabaseName || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
+    _rawDbName = geotabDatabaseName || 'default';
+    _dbId = _rawDbName.replace(/[^a-zA-Z0-9_-]/g, '_');
     try {
       if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
@@ -90,7 +92,7 @@ var FS = (function () {
       .catch(function (e) { if (typeof cb === 'function') cb(e); });
   }
 
-  return { configure: configure, save: save, load: load, remove: remove };
+  return { configure: configure, save: save, load: load, remove: remove, rawDbName: function() { return _rawDbName; } };
 })();
 
 /* ── Main Dashboard ─────────────────────────────────────── */
@@ -558,12 +560,13 @@ var safetyDash = (function () {
 
   function saveScheduleData(cb) {
     var payload = {
-      emails:    _schedEmails,
-      enabled:   _schedEnabled,
-      freq:      document.getElementById('schedFreq').value,
-      dataRange: document.getElementById('schedDataRange').value,
-      time:      document.getElementById('schedTime').value,
-      start:     document.getElementById('schedStart').value
+      emails:       _schedEmails,
+      enabled:      _schedEnabled,
+      freq:         document.getElementById('schedFreq').value,
+      dataRange:    document.getElementById('schedDataRange').value,
+      time:         document.getElementById('schedTime').value,
+      start:        document.getElementById('schedStart').value,
+      geotabDatabase: FS.rawDbName()
     };
     FS.save('schedule', payload, cb);
   }
