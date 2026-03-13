@@ -16,87 +16,76 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 </head>
-<body class="has-grid">
+<body>
 
-<div id="app">
+<div id="safetyscorecard" style="display:none;">
 
-  <!-- ── Header ─────────────────────────────────────────── -->
-  <div class="hdr">
-    <div class="hdr-brand">
-      <img
-        class="hdr-logo"
-        src="https://cdn.baseline.is/static/content/logos/mDtvptChQ3XwBLuxuu5hip-lala.svg"
-        alt="Baseline"
-      />
-      <div class="hdr-divider"></div>
-      <div class="hdr-title">
-        <h1>Driver Safety Scorecard</h1>
-        <p class="date-range" id="dateRange"></p>
-      </div>
+  <!-- Action buttons hoisted into the dashboard suite header by the parent -->
+  <div data-suite-actions style="display:none;">
+    <!-- Date range buttons -->
+    <div class="range-group" style="display:flex;gap:4px;">
+      <button class="range-btn"        onclick="safetyDash.setRange(7)">7D</button>
+      <button class="range-btn active" onclick="safetyDash.setRange(30)">30D</button>
+      <button class="range-btn"        onclick="safetyDash.setRange(60)">60D</button>
+      <button class="range-btn"        onclick="safetyDash.setRange(90)">90D</button>
     </div>
 
-    <div class="hdr-right">
-      <!-- Date range buttons -->
-      <div class="range-group">
-        <button class="range-btn"        onclick="safetyDash.setRange(7)">7D</button>
-        <button class="range-btn active" onclick="safetyDash.setRange(30)">30D</button>
-        <button class="range-btn"        onclick="safetyDash.setRange(60)">60D</button>
-        <button class="range-btn"        onclick="safetyDash.setRange(90)">90D</button>
-      </div>
-
-      <!-- Theme toggle -->
-      <div class="toggle-wrap" onclick="safetyDash.toggleTheme()">
-        <div class="toggle-track"><div class="toggle-thumb"></div></div>
-        <span class="toggle-lbl" id="themeLbl">DARK</span>
-      </div>
-
-      <!-- Action buttons -->
-      <button class="btn" id="btnInfo" onclick="safetyDash.toggleInfo()" title="How scoring works">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="12" y1="16" x2="12" y2="12"/>
-          <line x1="12" y1="8" x2="12.01" y2="8"/>
-        </svg>
-        How It Works
-      </button>
-
-      <button class="btn" id="btnSchedule" onclick="safetyDash.togglePanel('schedule')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="4" width="18" height="18" rx="2"/>
-          <line x1="16" y1="2" x2="16" y2="6"/>
-          <line x1="8"  y1="2" x2="8"  y2="6"/>
-          <line x1="3"  y1="10" x2="21" y2="10"/>
-        </svg>
-        Schedule Report
-      </button>
-
-      <button class="btn" id="btnWeights" onclick="safetyDash.togglePanel('weights')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-        Weights
-      </button>
-
-      <button class="btn btn-rules" id="btnRules" onclick="safetyDash.togglePanel('rules')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 11l3 3L22 4"/>
-          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-        </svg>
-        Rules
-      </button>
-
-      <button class="btn" id="btnRefresh">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-          <path d="M21 3v5h-5"/>
-          <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-          <path d="M8 16H3v5"/>
-        </svg>
-        Refresh
-      </button>
+    <!-- Theme toggle -->
+    <div class="toggle-wrap" onclick="safetyDash.toggleTheme()">
+      <div class="toggle-track"><div class="toggle-thumb"></div></div>
+      <span class="toggle-lbl" id="themeLbl">DARK</span>
     </div>
-  </div><!-- /.hdr -->
+
+    <button class="btn" id="btnInfo" onclick="safetyDash.toggleInfo()" title="How scoring works">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="16" x2="12" y2="12"/>
+        <line x1="12" y1="8" x2="12.01" y2="8"/>
+      </svg>
+      How It Works
+    </button>
+
+    <button class="btn" id="btnSchedule" onclick="safetyDash.togglePanel('schedule')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8"  y1="2" x2="8"  y2="6"/>
+        <line x1="3"  y1="10" x2="21" y2="10"/>
+      </svg>
+      Schedule
+    </button>
+
+    <button class="btn" id="btnWeights" onclick="safetyDash.togglePanel('weights')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      Weights
+    </button>
+
+    <button class="btn btn-rules" id="btnRules" onclick="safetyDash.togglePanel('rules')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 11l3 3L22 4"/>
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+      Rules
+    </button>
+
+    <button class="btn" id="btnRefresh">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+        <path d="M21 3v5h-5"/>
+        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+        <path d="M8 16H3v5"/>
+      </svg>
+      Refresh
+    </button>
+  </div>
+
+  <!-- Inline subtitle: date range only (no logo, dashboard owns the header) -->
+  <div class="sc-sub" style="padding:12px 20px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <p class="date-range" id="dateRange" style="margin:0;font-size:0.8rem;color:#64748b;"></p>
+  </div>
 
   <!-- ── KPI Cards ───────────────────────────────────────── -->
   <div class="kpis">
@@ -396,7 +385,7 @@
   </div>
 
   <div class="foot" id="foot"></div>
-</div><!-- /#app -->
+</div><!-- /#safetyscorecard -->
 
 <div class="toast" id="toast"></div>
 

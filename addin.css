@@ -61,70 +61,23 @@ html, body {
   transition: background .3s, color .3s;
 }
 
-body.has-grid {
-  background-image:
-    linear-gradient(var(--grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-  background-size: 40px 40px;
-}
+/* body.has-grid removed — dashboard controls body background */
 
 /* ── App Shell ──────────────────────────────────────────── */
-#app {
+#safetyscorecard {
   position: relative;
   z-index: 1;
   max-width: 1380px;
   margin: 0 auto;
-  padding: 28px 24px;
+  padding: 16px 24px 28px;
 }
 
-/* ── Header ─────────────────────────────────────────────── */
-.hdr {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 28px;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.hdr-brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.hdr-logo {
-  height: 36px;
-  width: auto;
-}
-
-.hdr-divider {
-  width: 1px;
-  height: 32px;
-  background: var(--border);
-}
-
-.hdr-title h1 {
-  font-size: 1.25rem;
-  font-weight: 800;
-  letter-spacing: -.03em;
-  color: var(--accent);
-  margin: 0;
-  line-height: 1.1;
-}
-
+/* ── Header removed — dashboard suite header is used instead ── */
+/* Date range subtitle shown inline below dashboard header */
 .date-range {
   font-size: .78rem;
   color: var(--text3);
-  margin-top: 3px;
   font-family: 'DM Mono', monospace;
-}
-
-.hdr-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
 }
 
 /* ── Range Buttons ──────────────────────────────────────── */
