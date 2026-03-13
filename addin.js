@@ -762,11 +762,11 @@ var safetyDash = (function () {
       fsSave({ preferences: { theme: _isLight ? 'light' : 'dark' } });
     },
 
-    toggleInfo: function () { document.getElementById('infoModal').classList.toggle('open'); },
+    toggleInfo: function () { safetyDash.togglePanel('info'); },
 
     togglePanel: function (which) {
-      var ids  = { weights: 'panelWeights', rules: 'panelRules', schedule: 'panelSchedule' };
-      var btns = { weights: 'btnWeights',   rules: 'btnRules',   schedule: 'btnSchedule' };
+      var ids  = { weights: 'panelWeights', rules: 'panelRules', schedule: 'panelSchedule', info: 'panelInfo' };
+      var btns = { weights: 'btnWeights',   rules: 'btnRules',   schedule: 'btnSchedule', info: 'btnInfo' };
       var anyOpen = false;
       Object.keys(ids).forEach(function (k) {
         if (k === which) {
@@ -788,8 +788,8 @@ var safetyDash = (function () {
     },
 
     closePanels: function () {
-      var ids  = { weights: 'panelWeights', rules: 'panelRules', schedule: 'panelSchedule' };
-      var btns = { weights: 'btnWeights',   rules: 'btnRules',   schedule: 'btnSchedule' };
+      var ids  = { weights: 'panelWeights', rules: 'panelRules', schedule: 'panelSchedule', info: 'panelInfo' };
+      var btns = { weights: 'btnWeights',   rules: 'btnRules',   schedule: 'btnSchedule', info: 'btnInfo' };
       Object.keys(ids).forEach(function (k) {
         document.getElementById(ids[k]).classList.remove('open');
         if (btns[k] && document.getElementById(btns[k])) document.getElementById(btns[k]).classList.remove('active-btn');

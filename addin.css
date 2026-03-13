@@ -665,14 +665,7 @@ td.td-driver { text-align: left; padding-left: 16px; }
 .sched-status.off { display: block; background: rgba(255,123,1,.08);   border: 1px solid rgba(255,123,1,.25);   color: var(--accent); }
 
 /* ── Info Modal ─────────────────────────────────────────── */
-.modal-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,.65);
-  z-index: 1200; display: none;
-  align-items: center; justify-content: center;
-  padding: 24px;
-}
-.modal-overlay.open { display: flex; }
+/* .modal-overlay removed — info content converted to inline panel */
 
 .modal {
   background: var(--bg2);

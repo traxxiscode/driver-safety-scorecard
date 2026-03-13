@@ -284,13 +284,14 @@
   </div><!-- /#panelSchedule -->
 
   <!-- ── Info Modal ──────────────────────────────────────── -->
-  <div class="modal-overlay" id="infoModal" onclick="if(event.target===this)safetyDash.toggleInfo()">
-    <div class="modal">
-      <div class="modal-hdr">
-        <span class="modal-title">&#9432;&nbsp; How Driver Scoring Works</span>
-        <span class="modal-close" onclick="safetyDash.toggleInfo()">&#x2715;</span>
-      </div>
+  <!-- ── Info Panel (replaces modal — panels work inside the dashboard) ── -->
+  <div class="panel" id="panelInfo">
+    <div class="panel-header">
+      <div class="panel-title">&#9432; How Driver Scoring Works</div>
+      <button class="panel-close-btn" onclick="safetyDash.togglePanel('info')" title="Close">&times;</button>
+    </div>
 
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:4px;">
       <div class="modal-section">
         <div class="modal-section-title">Score Formula</div>
         <div class="modal-body">Every driver starts with a perfect score of 100. Points are deducted for each safety rule violation, scaled by miles driven in the period.</div>
@@ -330,7 +331,7 @@
         </div>
       </div>
     </div>
-  </div><!-- /#infoModal -->
+  </div><!-- /#panelInfo -->
 
   <!-- ── Scorecard Table ─────────────────────────────────── -->
   <div class="sec-hdr">
