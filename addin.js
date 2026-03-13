@@ -721,7 +721,20 @@ var safetyDash = (function () {
     init: function (api, databaseName) {
       _api = api;
       setDateRange();
-      document.getElementById('btnRefresh').onclick = fetchData;
+
+      // Attach listeners by ID rather than relying on inline onclick= —
+      // buttons are hoisted into the dashboard header after init runs, so
+      // inline onclick strings may not resolve safetyDash in the host scope.
+      function bindBtn(id, fn) {
+        var el = document.getElementById(id);
+        if (el) { el.onclick = fn; }
+      }
+      bindBtn('btnRefresh',  fetchData);
+      bindBtn('btnInfo',     function () { safetyDash.togglePanel('info'); });
+      bindBtn('btnSchedule', function () { safetyDash.togglePanel('schedule'); });
+      bindBtn('btnWeights',  function () { safetyDash.togglePanel('weights'); });
+      bindBtn('btnRules',    function () { safetyDash.togglePanel('rules'); });
+
       document.getElementById('schedStart').value = new Date().toISOString().split('T')[0];
 
       // Initialise Firestore (auth + ensure doc), then load theme/schedule,

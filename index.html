@@ -36,7 +36,7 @@
       <span class="toggle-lbl" id="themeLbl">DARK</span>
     </div>
 
-    <button class="btn" id="btnInfo" onclick="safetyDash.toggleInfo()" title="How scoring works">
+    <button class="btn" id="btnInfo" title="How scoring works">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/>
         <line x1="12" y1="16" x2="12" y2="12"/>
@@ -45,7 +45,7 @@
       How It Works
     </button>
 
-    <button class="btn" id="btnSchedule" onclick="safetyDash.togglePanel('schedule')">
+    <button class="btn" id="btnSchedule" >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="4" width="18" height="18" rx="2"/>
         <line x1="16" y1="2" x2="16" y2="6"/>
@@ -55,7 +55,7 @@
       Schedule
     </button>
 
-    <button class="btn" id="btnWeights" onclick="safetyDash.togglePanel('weights')">
+    <button class="btn" id="btnWeights" >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="3"/>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -63,7 +63,7 @@
       Weights
     </button>
 
-    <button class="btn btn-rules" id="btnRules" onclick="safetyDash.togglePanel('rules')">
+    <button class="btn btn-rules" id="btnRules" >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M9 11l3 3L22 4"/>
         <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
@@ -152,7 +152,7 @@
         </div>
       </div>
       <span class="panel-count" id="weightsCount"></span>
-      <button class="panel-close-btn" onclick="safetyDash.togglePanel('weights')" title="Close">&times;</button>
+      <button class="panel-close-btn"  title="Close">&times;</button>
     </div>
     <div class="panel-desc">Each weight is a percentage of the total score (must sum to 100). Higher weight = bigger impact. Rules are auto-equalized when added or removed.</div>
 
@@ -181,7 +181,7 @@
     <div class="panel-header">
       <div class="panel-title">&#10003; Rule Configuration</div>
       <span class="panel-count" id="ruleCount"></span>
-      <button class="panel-close-btn" onclick="safetyDash.togglePanel('rules')" title="Close">&times;</button>
+      <button class="panel-close-btn"  title="Close">&times;</button>
     </div>
     <div class="panel-desc">Toggle which exception rules affect driver scores. Maximum 6 rules active at once. Custom rules appear under Uncategorized.</div>
     <div class="rule-limit-warn" id="ruleLimitWarn">Maximum 6 rules selected. Disable a rule before enabling another.</div>
@@ -277,7 +277,7 @@
     <div class="sched-status" id="schedStatus"></div>
 
     <div class="panel-footer">
-      <button class="btn" onclick="safetyDash.togglePanel('schedule')">Cancel</button>
+      <button class="btn" >Cancel</button>
       <button class="btn" id="btnSchedDisable" onclick="safetyDash.disableSchedule()" style="display:none;">Disable Schedule</button>
       <button class="btn btn-apply" onclick="safetyDash.saveSchedule()">Save Schedule</button>
     </div>
