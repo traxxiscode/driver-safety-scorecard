@@ -705,74 +705,100 @@ var safetyDash = (function () {
   }
 
   function doFetch(dmap, fromStr, toStr) {
-    // Single broad Trip call replaces one-per-device loop — eliminates the
-    // 1000 API calls/min rate limit hit that caused all miles to show as 0.
-    showBox('FETCHING TRIPS…', 25);
-    console.log('[Scorecard] doFetch — fetching all trips in date range:', fromStr, '→', toStr);
+    // Trips are fetched in sequential 3-day windows to stay under the 50,000-record
+    // API limit. Each window makes one call; windows run one at a time to stay
+    // well within the 1,000 calls/min rate limit.
+    var WINDOW_DAYS = 3;
+    var milesMap = {}, tripCount = {};
 
-    _api.call('Get', {
-      typeName: 'Trip',
-      search:   { fromDate: fromStr, toDate: toStr },
-      resultsLimit: 50000
-    }, function (trips) {
-      trips = trips || [];
-      console.log('[Scorecard] Trips returned:', trips.length);
+    // Build list of [windowFrom, windowTo] pairs covering the full range
+    var windows = [];
+    var cursor = new Date(fromStr);
+    var end    = new Date(toStr);
+    while (cursor < end) {
+      var wEnd = new Date(cursor);
+      wEnd.setDate(wEnd.getDate() + WINDOW_DAYS);
+      if (wEnd > end) wEnd = end;
+      windows.push([cursor.toISOString(), wEnd.toISOString()]);
+      cursor = wEnd;
+    }
+    console.log('[Scorecard] doFetch — ' + windows.length + ' x ' + WINDOW_DAYS + '-day trip windows, range:', fromStr, '→', toStr);
 
-      var milesMap = {}, tripCount = {};
-      var tripsWithDriver = 0, tripsSkipped = 0;
+    var winIdx = 0;
 
-      trips.forEach(function (t) {
-        var did = t.driver && t.driver.id;
-        if (!did || did === 'UnknownDriverId') { tripsSkipped++; return; }
-        tripsWithDriver++;
-        milesMap[did]  = (milesMap[did]  || 0) + ((parseFloat(t.distance) || 0) * 0.621371);
-        tripCount[did] = (tripCount[did] || 0) + 1;
-        if (!dmap[did] && t.driver) { var dn = buildDriverName(t.driver); if (dn) dmap[did] = dn; }
-      });
+    function fetchNextWindow() {
+      if (winIdx >= windows.length) {
+        // All windows done — move on to exceptions
+        console.log('[Scorecard] All trip windows complete. Unique drivers with trips:', Object.keys(milesMap).length);
+        Object.keys(milesMap).slice(0, 5).forEach(function (did) {
+          console.log('[Scorecard]   Driver', did, '(' + (dmap[did] || 'unknown') + '):', Math.round(milesMap[did] * 10) / 10, 'miles,', tripCount[did], 'trips');
+        });
 
-      console.log('[Scorecard] Trip processing: ' + tripsWithDriver + ' with driver, ' + tripsSkipped + ' skipped, ' + Object.keys(milesMap).length + ' unique drivers');
-      Object.keys(milesMap).slice(0, 5).forEach(function (did) {
-        console.log('[Scorecard]   Driver', did, '(' + (dmap[did] || 'unknown') + '):', Math.round(milesMap[did] * 10) / 10, 'miles,', tripCount[did], 'trips');
-      });
+        var pct = Math.round(25 + (winIdx / windows.length) * 30);
+        showBox('FETCHING EXCEPTION EVENTS…', pct);
+        fetchAllExceptions(_api, fromStr, toStr, getEnabledRules(), function (ebrd) {
+          showBox('BUILDING SCORECARDS…', 85);
 
-      showBox('FETCHING EXCEPTION EVENTS…', 55);
+          var seen = {};
+          Object.keys(milesMap).forEach(function (k) { seen[k] = 1; });
+          Object.keys(ebrd).forEach(function (k) { seen[k] = 1; });
+          console.log('[Scorecard] Total unique drivers:', Object.keys(seen).length);
 
-      fetchAllExceptions(_api, fromStr, toStr, getEnabledRules(), function (ebrd) {
-        showBox('BUILDING SCORECARDS…', 85);
-
-        var seen = {};
-        Object.keys(milesMap).forEach(function (k) { seen[k] = 1; });
-        Object.keys(ebrd).forEach(function (k) { seen[k] = 1; });
-        console.log('[Scorecard] Total unique drivers:', Object.keys(seen).length);
-
-        _rawData = [];
-        Object.keys(seen).forEach(function (did) {
-          var mi = Math.round((milesMap[did] || 0) * 10) / 10;
-          _rawData.push({
-            dname:      dmap[did] || ('Driver ' + did),
-            norm:       mi || 1,
-            displayVal: Math.round(mi),
-            tripCount:  tripCount[did] || 0,
-            ebr:        ebrd[did] || {},
-            did:        did
+          _rawData = [];
+          Object.keys(seen).forEach(function (did) {
+            var mi = Math.round((milesMap[did] || 0) * 10) / 10;
+            _rawData.push({
+              dname:      dmap[did] || ('Driver ' + did),
+              norm:       mi || 1,
+              displayVal: Math.round(mi),
+              tripCount:  tripCount[did] || 0,
+              ebr:        ebrd[did] || {},
+              did:        did
+            });
           });
-        });
 
-        console.log('[Scorecard] _rawData rows:', _rawData.length);
-        _rawData.slice(0, 3).forEach(function (r) {
-          console.log('[Scorecard]   Row:', r.dname, '| miles:', r.displayVal, '| trips:', r.tripCount, '| ebr:', JSON.stringify(r.ebr));
-        });
+          console.log('[Scorecard] _rawData rows:', _rawData.length);
+          _rawData.slice(0, 3).forEach(function (r) {
+            console.log('[Scorecard]   Row:', r.dname, '| miles:', r.displayVal, '| trips:', r.tripCount, '| ebr:', JSON.stringify(r.ebr));
+          });
 
-        if (!_rawData.length) { showBox(''); showErr('No driver data found.'); return; }
-        rebuildRows();
-        var dids = _rawData.map(function (d) { return d.did; }).filter(Boolean);
-        if (dids.length) loadDriverGroups(dids);
+          if (!_rawData.length) { showBox(''); showErr('No driver data found.'); return; }
+          rebuildRows();
+          var dids = _rawData.map(function (d) { return d.did; }).filter(Boolean);
+          if (dids.length) loadDriverGroups(dids);
+        });
+        return;
+      }
+
+      var w   = windows[winIdx];
+      var pct = Math.round(25 + (winIdx / windows.length) * 30);
+      showBox('FETCHING TRIPS… (window ' + (winIdx + 1) + '/' + windows.length + ')', pct);
+      console.log('[Scorecard] Trip window ' + (winIdx + 1) + '/' + windows.length + ':', w[0], '→', w[1]);
+      winIdx++;
+
+      _api.call('Get', {
+        typeName: 'Trip',
+        search:   { fromDate: w[0], toDate: w[1] },
+        resultsLimit: 50000
+      }, function (trips) {
+        trips = trips || [];
+        console.log('[Scorecard]   Window returned ' + trips.length + ' trips' + (trips.length === 50000 ? ' (HIT LIMIT — consider narrowing WINDOW_DAYS)' : ''));
+        trips.forEach(function (t) {
+          var did = t.driver && t.driver.id;
+          if (!did || did === 'UnknownDriverId') return;
+          milesMap[did]  = (milesMap[did]  || 0) + ((parseFloat(t.distance) || 0) * 0.621371);
+          tripCount[did] = (tripCount[did] || 0) + 1;
+          if (!dmap[did] && t.driver) { var dn = buildDriverName(t.driver); if (dn) dmap[did] = dn; }
+        });
+        fetchNextWindow();
+      }, function (err) {
+        showBox(''); showErr('Trip fetch failed (window ' + winIdx + '): ' + (err && err.message ? err.message : JSON.stringify(err)));
       });
+    }
 
-    }, function (err) {
-      showBox(''); showErr('Trip fetch failed: ' + (err && err.message ? err.message : JSON.stringify(err)));
-    });
+    fetchNextWindow();
   }
+
 
   /* ── Public API ── */
   return {
