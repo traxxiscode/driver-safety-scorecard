@@ -665,44 +665,61 @@ var safetyDash = (function () {
   }
 
   /* ── Fetch ExceptionEvents: one call per enabled rule to stay under rate limit ── */
-  function fetchAllExceptions(api, fromStr, toStr, enabledRuleIds, onComplete) {
+  function fetchAllExceptions(api, fromStr, toStr, enabledRuleIds, windows, onComplete) {
+    // Uses the same time windows as trip fetching so no single call can hit the
+    // 50,000-record limit, even for high-volume rules.
     if (!enabledRuleIds || !enabledRuleIds.length) {
       console.log('[Scorecard] No enabled rules — skipping ExceptionEvent fetch');
       onComplete({});
       return;
     }
-    console.log('[Scorecard] Fetching ExceptionEvents for ' + enabledRuleIds.length + ' rules (one call each)');
-    var remaining = enabledRuleIds.length;
+    console.log('[Scorecard] Fetching ExceptionEvents: ' + enabledRuleIds.length + ' rules × ' + windows.length + ' windows each');
     var ebrd = {};
     var totalEvents = 0;
+    var rulesRemaining = enabledRuleIds.length;
 
     enabledRuleIds.forEach(function (rid) {
-      api.call('Get', {
-        typeName: 'ExceptionEvent',
-        search:   { fromDate: fromStr, toDate: toStr, ruleSearch: { id: rid } },
-        resultsLimit: 50000
-      }, function (evts) {
-        evts = evts || [];
-        totalEvents += evts.length;
-        console.log('[Scorecard] Rule ' + rid + ': ' + evts.length + ' exception events');
-        evts.forEach(function (e) {
-          var did = e.driver && e.driver.id;
-          if (!did || did === 'UnknownDriverId') return;
-          if (!ebrd[did]) ebrd[did] = {};
-          ebrd[did][rid] = (ebrd[did][rid] || 0) + 1;
-        });
-        remaining--;
-        if (remaining === 0) {
-          console.log('[Scorecard] ExceptionEvent totals: ' + totalEvents + ' events across ' + Object.keys(ebrd).length + ' drivers');
-          onComplete(ebrd);
+      // Fetch each window for this rule sequentially
+      var winIdx = 0;
+
+      function fetchNextExcWindow() {
+        if (winIdx >= windows.length) {
+          // This rule is done
+          rulesRemaining--;
+          if (rulesRemaining === 0) {
+            console.log('[Scorecard] ExceptionEvent totals: ' + totalEvents + ' events across ' + Object.keys(ebrd).length + ' drivers');
+            onComplete(ebrd);
+          }
+          return;
         }
-      }, function (err) {
-        console.error('[Scorecard] ExceptionEvent fetch failed for rule ' + rid + ':', err);
-        remaining--;
-        if (remaining === 0) onComplete(ebrd);
-      });
+        var w = windows[winIdx++];
+        api.call('Get', {
+          typeName: 'ExceptionEvent',
+          search:   { fromDate: w[0], toDate: w[1], ruleSearch: { id: rid } },
+          resultsLimit: 50000
+        }, function (evts) {
+          evts = evts || [];
+          if (evts.length === 50000) {
+            console.warn('[Scorecard] Rule ' + rid + ' window ' + winIdx + ' HIT 50k LIMIT — consider reducing WINDOW_DAYS');
+          }
+          totalEvents += evts.length;
+          evts.forEach(function (e) {
+            var did = e.driver && e.driver.id;
+            if (!did || did === 'UnknownDriverId') return;
+            if (!ebrd[did]) ebrd[did] = {};
+            ebrd[did][rid] = (ebrd[did][rid] || 0) + 1;
+          });
+          fetchNextExcWindow();
+        }, function (err) {
+          console.error('[Scorecard] ExceptionEvent fetch failed for rule ' + rid + ' window ' + winIdx + ':', err);
+          fetchNextExcWindow(); // skip failed window, keep going
+        });
+      }
+
+      fetchNextExcWindow();
     });
   }
+
 
   function doFetch(dmap, fromStr, toStr) {
     // Trips are fetched in sequential 3-day windows to stay under the 50,000-record
@@ -736,7 +753,7 @@ var safetyDash = (function () {
 
         var pct = Math.round(25 + (winIdx / windows.length) * 30);
         showBox('FETCHING EXCEPTION EVENTS…', pct);
-        fetchAllExceptions(_api, fromStr, toStr, getEnabledRules(), function (ebrd) {
+        fetchAllExceptions(_api, fromStr, toStr, getEnabledRules(), windows, function (ebrd) {
           showBox('BUILDING SCORECARDS…', 85);
 
           var seen = {};
