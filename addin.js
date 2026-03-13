@@ -664,56 +664,25 @@ var safetyDash = (function () {
     });
   }
 
-  /* ── Batch helper: splits calls into chunks and fires sequential multiCalls ── */
-  function batchedMultiCall(api, calls, chunkSize, onComplete, onError) {
-    var results = new Array(calls.length);
-    var chunks  = [];
-    for (var i = 0; i < calls.length; i += chunkSize) {
-      chunks.push({ calls: calls.slice(i, i + chunkSize), offset: i });
-    }
-    console.log('[Scorecard] batchedMultiCall: ' + calls.length + ' calls split into ' + chunks.length + ' batches of ≤' + chunkSize);
-    var idx = 0;
-    function next() {
-      if (idx >= chunks.length) { onComplete(results); return; }
-      var chunk = chunks[idx++];
-      console.log('[Scorecard] Firing batch ' + idx + '/' + chunks.length + ' (' + chunk.calls.length + ' calls, offset ' + chunk.offset + ')');
-      api.multiCall(chunk.calls, function (res) {
-        if (res) {
-          for (var j = 0; j < res.length; j++) results[chunk.offset + j] = res[j];
-        }
-        next();
-      }, function (err) {
-        console.error('[Scorecard] Batch ' + idx + ' failed:', err);
-        // On batch failure, fill results with empty arrays so we don't lose other batches
-        for (var j = 0; j < chunk.calls.length; j++) results[chunk.offset + j] = results[chunk.offset + j] || [];
-        next();
-      });
-    }
-    next();
-  }
-
-  /* ── Fetch ExceptionEvents in pages to handle large databases ── */
-  function fetchAllExceptions(api, fromStr, toStr, enabledRuleIds, onComplete, onError) {
-    // Build one call per enabled rule to avoid blowing the single-call resultsLimit
+  /* ── Fetch ExceptionEvents: one call per enabled rule to stay under rate limit ── */
+  function fetchAllExceptions(api, fromStr, toStr, enabledRuleIds, onComplete) {
     if (!enabledRuleIds || !enabledRuleIds.length) {
       console.log('[Scorecard] No enabled rules — skipping ExceptionEvent fetch');
       onComplete({});
       return;
     }
-    console.log('[Scorecard] Fetching ExceptionEvents for ' + enabledRuleIds.length + ' rules');
-    var excCalls = enabledRuleIds.map(function (rid) {
-      return ['Get', {
+    console.log('[Scorecard] Fetching ExceptionEvents for ' + enabledRuleIds.length + ' rules (one call each)');
+    var remaining = enabledRuleIds.length;
+    var ebrd = {};
+    var totalEvents = 0;
+
+    enabledRuleIds.forEach(function (rid) {
+      api.call('Get', {
         typeName: 'ExceptionEvent',
         search:   { fromDate: fromStr, toDate: toStr, ruleSearch: { id: rid } },
         resultsLimit: 50000
-      }];
-    });
-    batchedMultiCall(api, excCalls, 50, function (results) {
-      var ebrd = {};
-      var totalEvents = 0;
-      results.forEach(function (evts, i) {
-        var rid = enabledRuleIds[i];
-        if (!evts || !evts.length) return;
+      }, function (evts) {
+        evts = evts || [];
         totalEvents += evts.length;
         console.log('[Scorecard] Rule ' + rid + ': ' + evts.length + ' exception events');
         evts.forEach(function (e) {
@@ -722,115 +691,87 @@ var safetyDash = (function () {
           if (!ebrd[did]) ebrd[did] = {};
           ebrd[did][rid] = (ebrd[did][rid] || 0) + 1;
         });
+        remaining--;
+        if (remaining === 0) {
+          console.log('[Scorecard] ExceptionEvent totals: ' + totalEvents + ' events across ' + Object.keys(ebrd).length + ' drivers');
+          onComplete(ebrd);
+        }
+      }, function (err) {
+        console.error('[Scorecard] ExceptionEvent fetch failed for rule ' + rid + ':', err);
+        remaining--;
+        if (remaining === 0) onComplete(ebrd);
       });
-      console.log('[Scorecard] ExceptionEvent totals: ' + totalEvents + ' events across ' + Object.keys(ebrd).length + ' drivers');
-      onComplete(ebrd);
-    }, onError);
+    });
   }
 
   function doFetch(dmap, fromStr, toStr) {
-    showBox('FETCHING DEVICES…', 20);
-    console.log('[Scorecard] doFetch start — range:', fromStr, '→', toStr);
+    // Single broad Trip call replaces one-per-device loop — eliminates the
+    // 1000 API calls/min rate limit hit that caused all miles to show as 0.
+    showBox('FETCHING TRIPS…', 25);
+    console.log('[Scorecard] doFetch — fetching all trips in date range:', fromStr, '→', toStr);
 
-    _api.call('Get', { typeName: 'Device', resultsLimit: 5000 }, function (devices) {
-      if (!devices || !devices.length) { showBox(''); showErr('No devices found.'); return; }
-      console.log('[Scorecard] Devices fetched:', devices.length);
-      showBox('FETCHING TRIPS FOR ' + devices.length + ' DEVICES…', 30);
+    _api.call('Get', {
+      typeName: 'Trip',
+      search:   { fromDate: fromStr, toDate: toStr },
+      resultsLimit: 50000
+    }, function (trips) {
+      trips = trips || [];
+      console.log('[Scorecard] Trips returned:', trips.length);
 
-      // Build per-device trip calls (no cap — process all devices)
-      var tripCalls = devices.map(function (d) {
-        return ['Get', {
-          typeName: 'Trip',
-          search:   { deviceSearch: { id: d.id }, fromDate: fromStr, toDate: toStr },
-          resultsLimit: 5000
-        }];
+      var milesMap = {}, tripCount = {};
+      var tripsWithDriver = 0, tripsSkipped = 0;
+
+      trips.forEach(function (t) {
+        var did = t.driver && t.driver.id;
+        if (!did || did === 'UnknownDriverId') { tripsSkipped++; return; }
+        tripsWithDriver++;
+        milesMap[did]  = (milesMap[did]  || 0) + ((parseFloat(t.distance) || 0) * 0.621371);
+        tripCount[did] = (tripCount[did] || 0) + 1;
+        if (!dmap[did] && t.driver) { var dn = buildDriverName(t.driver); if (dn) dmap[did] = dn; }
       });
 
-      console.log('[Scorecard] Queuing ' + tripCalls.length + ' trip calls in batches of 50');
-
-      // Batch trip calls in chunks of 50 (well under Geotab's ~100 limit)
-      batchedMultiCall(_api, tripCalls, 50, function (tripResults) {
-        showBox('FETCHING EXCEPTION EVENTS…', 60);
-
-        var milesMap = {}, tripCount = {};
-        var tripsWithDriver = 0, tripsSkipped = 0;
-
-        devices.forEach(function (d, i) {
-          var trips = tripResults[i] || [];
-          trips.forEach(function (t) {
-            var did = t.driver && t.driver.id;
-            if (!did || did === 'UnknownDriverId') { tripsSkipped++; return; }
-            tripsWithDriver++;
-            var km = parseFloat(t.distance) || 0;
-            milesMap[did]  = (milesMap[did]  || 0) + (km * 0.621371);
-            tripCount[did] = (tripCount[did] || 0) + 1;
-            if (!dmap[did] && t.driver) { var dn = buildDriverName(t.driver); if (dn) dmap[did] = dn; }
-          });
-        });
-
-        console.log('[Scorecard] Trip processing complete:',
-          tripsWithDriver, 'trips with driver,',
-          tripsSkipped,    'trips without driver,',
-          Object.keys(milesMap).length, 'unique drivers found'
-        );
-        // Log a sample of mileage to verify values
-        var sampleKeys = Object.keys(milesMap).slice(0, 5);
-        sampleKeys.forEach(function (did) {
-          console.log('[Scorecard]   Driver', did, '(' + (dmap[did] || 'unknown') + '):', Math.round(milesMap[did] * 10) / 10, 'miles,', tripCount[did], 'trips');
-        });
-
-        var enabledRuleIds = getEnabledRules();
-        fetchAllExceptions(_api, fromStr, toStr, enabledRuleIds, function (ebrd) {
-          showBox('BUILDING SCORECARDS…', 85);
-
-          // Also register drivers that have exceptions but no trips
-          Object.keys(ebrd).forEach(function (did) {
-            if (!dmap[did]) {
-              // driver name unknown from trips — will fall back to 'Driver <id>'
-            }
-          });
-
-          var seen = {};
-          Object.keys(milesMap).forEach(function (k) { seen[k] = 1; });
-          Object.keys(ebrd).forEach(function (k) { seen[k] = 1; });
-
-          console.log('[Scorecard] Total unique drivers (trips + exceptions):', Object.keys(seen).length);
-
-          _rawData = [];
-          Object.keys(seen).forEach(function (did) {
-            var mi = Math.round((milesMap[did] || 0) * 10) / 10;
-            _rawData.push({
-              dname:      dmap[did] || ('Driver ' + did),
-              norm:       mi || 1,
-              displayVal: Math.round(mi),
-              tripCount:  tripCount[did] || 0,
-              ebr:        ebrd[did] || {},
-              did:        did
-            });
-          });
-
-          console.log('[Scorecard] _rawData rows:', _rawData.length);
-          if (_rawData.length) {
-            // Sanity-check: log first 3 rows
-            _rawData.slice(0, 3).forEach(function (r) {
-              console.log('[Scorecard]   Row:', r.dname, '| miles:', r.displayVal, '| trips:', r.tripCount, '| ebr:', JSON.stringify(r.ebr));
-            });
-          }
-
-          if (!_rawData.length) { showBox(''); showErr('No driver data found.'); return; }
-          rebuildRows();
-          var dids = _rawData.map(function (d) { return d.did; }).filter(Boolean);
-          if (dids.length) loadDriverGroups(dids);
-
-        }, function (err) {
-          showBox(''); showErr('Exception fetch failed: ' + (err && err.message ? err.message : JSON.stringify(err)));
-        });
-
-      }, function (err) {
-        showBox(''); showErr('Trip fetch failed: ' + (err && err.message ? err.message : JSON.stringify(err)));
+      console.log('[Scorecard] Trip processing: ' + tripsWithDriver + ' with driver, ' + tripsSkipped + ' skipped, ' + Object.keys(milesMap).length + ' unique drivers');
+      Object.keys(milesMap).slice(0, 5).forEach(function (did) {
+        console.log('[Scorecard]   Driver', did, '(' + (dmap[did] || 'unknown') + '):', Math.round(milesMap[did] * 10) / 10, 'miles,', tripCount[did], 'trips');
       });
 
-    }, function (err) { showBox(''); showErr('Device fetch failed: ' + (err && err.message ? err.message : JSON.stringify(err))); });
+      showBox('FETCHING EXCEPTION EVENTS…', 55);
+
+      fetchAllExceptions(_api, fromStr, toStr, getEnabledRules(), function (ebrd) {
+        showBox('BUILDING SCORECARDS…', 85);
+
+        var seen = {};
+        Object.keys(milesMap).forEach(function (k) { seen[k] = 1; });
+        Object.keys(ebrd).forEach(function (k) { seen[k] = 1; });
+        console.log('[Scorecard] Total unique drivers:', Object.keys(seen).length);
+
+        _rawData = [];
+        Object.keys(seen).forEach(function (did) {
+          var mi = Math.round((milesMap[did] || 0) * 10) / 10;
+          _rawData.push({
+            dname:      dmap[did] || ('Driver ' + did),
+            norm:       mi || 1,
+            displayVal: Math.round(mi),
+            tripCount:  tripCount[did] || 0,
+            ebr:        ebrd[did] || {},
+            did:        did
+          });
+        });
+
+        console.log('[Scorecard] _rawData rows:', _rawData.length);
+        _rawData.slice(0, 3).forEach(function (r) {
+          console.log('[Scorecard]   Row:', r.dname, '| miles:', r.displayVal, '| trips:', r.tripCount, '| ebr:', JSON.stringify(r.ebr));
+        });
+
+        if (!_rawData.length) { showBox(''); showErr('No driver data found.'); return; }
+        rebuildRows();
+        var dids = _rawData.map(function (d) { return d.did; }).filter(Boolean);
+        if (dids.length) loadDriverGroups(dids);
+      });
+
+    }, function (err) {
+      showBox(''); showErr('Trip fetch failed: ' + (err && err.message ? err.message : JSON.stringify(err)));
+    });
   }
 
   /* ── Public API ── */
