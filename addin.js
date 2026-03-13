@@ -489,8 +489,10 @@ var safetyDash = (function () {
       rules.forEach(function (rule) {
         var cfg = _ruleConfig[rule.id] || { enabled: false, category: cat, perEvent: 3 };
         var on  = cfg.enabled;
+        var atLimit = getEnabledRules().length >= MAX_RULES;
+        var disabled = atLimit && !on;
         var ptOpts = [1,2,3,4,5,7,10].map(function (v) { return '<option value="' + v + '"' + (cfg.perEvent === v ? ' selected' : '') + '>' + v + 'pt</option>'; }).join('');
-        h += '<div class="rule-row' + (on ? ' rule-on' : '') + '" id="rr_' + rule.id + '" onclick="safetyDash.toggleRule(\'' + rule.id + '\')">' +
+        h += '<div class="rule-row' + (on ? ' rule-on' : '') + (disabled ? ' rule-disabled' : '') + '" id="rr_' + rule.id + '" onclick="safetyDash.toggleRule(\'' + rule.id + '\')">' +
           '<div class="rule-chk"><svg viewBox="0 0 12 10" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="1,5 4.5,8.5 11,1"/></svg></div>' +
           '<div class="rule-info"><div class="rule-nm" title="' + rule.name + '">' + rule.name + '</div><div class="rule-meta">' + CAT_LABELS[cat] + '</div></div>' +
           '<select class="rule-wt" onclick="event.stopPropagation()" onchange="safetyDash.setRuleWt(\'' + rule.id + '\',this.value)">' + ptOpts + '</select>' +
