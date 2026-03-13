@@ -65,8 +65,6 @@ html, body {
 
 /* ── App Shell ──────────────────────────────────────────── */
 #safetyscorecard {
-  position: relative;
-  z-index: 1;
   max-width: 1380px;
   margin: 0 auto;
   padding: 16px 24px 28px;
@@ -84,17 +82,16 @@ html, body {
 .range-group {
   display: flex;
   gap: 4px;
-  background: var(--bg2);
-  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.25);
   border-radius: 10px;
   padding: 4px;
-  box-shadow: var(--shadow);
 }
 
 .range-btn {
   background: transparent;
   border: none;
-  color: var(--text3);
+  color: rgba(255,255,255,0.65);
   padding: 6px 14px;
   border-radius: 7px;
   cursor: pointer;
@@ -105,12 +102,12 @@ html, body {
   letter-spacing: .03em;
 }
 
-.range-btn:hover { color: var(--text); }
+.range-btn:hover { color: #fff !important; background: rgba(255,255,255,0.1) !important; }
 
 .range-btn.active {
-  background: var(--bg3);
-  color: var(--accent);
-  border: 1px solid rgba(255,123,1,.3);
+  background: rgba(255,123,1,0.35) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255,123,1,0.6);
 }
 
 /* ── Buttons ────────────────────────────────────────────── */
@@ -671,7 +668,7 @@ td.td-driver { text-align: left; padding-left: 16px; }
 .modal-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,.65);
-  z-index: 500; display: none;
+  z-index: 1200; display: none;
   align-items: center; justify-content: center;
   padding: 24px;
 }
