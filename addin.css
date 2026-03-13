@@ -307,11 +307,14 @@ body.light .toggle-thumb { transform: translateX(16px); }
 .panel-close-btn:hover { color: var(--text); background: var(--border); }
 
 /* Click-outside overlay — sits behind panels, above the rest of the page */
+/* panelOverlay is now purely visual (dim bg) — pointer-events:none so it
+   never blocks scroll or clicks; outside-click is handled in JS */
 #panelOverlay {
   display: none;
   position: fixed;
   inset: 0;
   z-index: 50;
+  pointer-events: none;
 }
 #panelOverlay.active { display: block; }
 /* Panels sit above the overlay (60) so they are clickable,

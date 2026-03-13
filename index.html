@@ -135,7 +135,7 @@
   </div><!-- /.kpis -->
 
   <!-- Click-outside overlay for panels -->
-  <div id="panelOverlay" onclick="safetyDash.closePanels()"></div>
+  <div id="panelOverlay"></div>
 
   <!-- ── Weights Panel ───────────────────────────────────── -->
   <div class="panel" id="panelWeights">
@@ -152,7 +152,7 @@
         </div>
       </div>
       <span class="panel-count" id="weightsCount"></span>
-      <button class="panel-close-btn"  title="Close">&times;</button>
+      <button class="panel-close-btn" id="btnCloseWeights" title="Close">&times;</button>
     </div>
     <div class="panel-desc">Each weight is a percentage of the total score (must sum to 100). Higher weight = bigger impact. Rules are auto-equalized when added or removed.</div>
 
@@ -181,7 +181,7 @@
     <div class="panel-header">
       <div class="panel-title">&#10003; Rule Configuration</div>
       <span class="panel-count" id="ruleCount"></span>
-      <button class="panel-close-btn"  title="Close">&times;</button>
+      <button class="panel-close-btn" id="btnCloseRules" title="Close">&times;</button>
     </div>
     <div class="panel-desc">Toggle which exception rules affect driver scores. Maximum 6 rules active at once. Custom rules appear under Uncategorized.</div>
     <div class="rule-limit-warn" id="ruleLimitWarn">Maximum 6 rules selected. Disable a rule before enabling another.</div>
@@ -200,6 +200,7 @@
     <div class="panel-header">
       <div class="panel-title">&#128197; Schedule Email Report</div>
       <span class="panel-count" id="schedCount"></span>
+      <button class="panel-close-btn" id="btnCloseSchedule" title="Close">&times;</button>
     </div>
     <div class="panel-desc">
       Automatically email the Driver Safety Scorecard as a CSV on a recurring schedule.
@@ -277,7 +278,6 @@
     <div class="sched-status" id="schedStatus"></div>
 
     <div class="panel-footer">
-      <button class="btn" >Cancel</button>
       <button class="btn" id="btnSchedDisable" onclick="safetyDash.disableSchedule()" style="display:none;">Disable Schedule</button>
       <button class="btn btn-apply" onclick="safetyDash.saveSchedule()">Save Schedule</button>
     </div>

@@ -731,13 +731,43 @@ var safetyDash = (function () {
         var el = document.getElementById(id);
         if (el) { el.onclick = fn; }
       }
-      bindBtn('btnRefresh',  fetchData);
-      bindBtn('btnInfo',     function () { safetyDash.togglePanel('info'); });
-      bindBtn('btnSchedule', function () { safetyDash.togglePanel('schedule'); });
-      bindBtn('btnWeights',  function () { safetyDash.togglePanel('weights'); });
-      bindBtn('btnRules',    function () { safetyDash.togglePanel('rules'); });
+      bindBtn('btnRefresh',       fetchData);
+      bindBtn('btnInfo',          function () { safetyDash.togglePanel('info'); });
+      bindBtn('btnSchedule',      function () { safetyDash.togglePanel('schedule'); });
+      bindBtn('btnWeights',       function () { safetyDash.togglePanel('weights'); });
+      bindBtn('btnRules',         function () { safetyDash.togglePanel('rules'); });
+      bindBtn('btnCloseWeights',  function () { safetyDash.togglePanel('weights'); });
+      bindBtn('btnCloseRules',    function () { safetyDash.togglePanel('rules'); });
+      bindBtn('btnCloseSchedule', function () { safetyDash.togglePanel('schedule'); });
 
       document.getElementById('schedStart').value = new Date().toISOString().split('T')[0];
+
+      // Close panels when clicking outside them (replaces overlay onclick which
+      // blocked scroll). Use mousedown so it fires before focus changes.
+      document.addEventListener('mousedown', function (e) {
+        var panelIds = ['panelWeights', 'panelRules', 'panelSchedule', 'panelInfo'];
+        // Check if any panel is open
+        var anyOpen = panelIds.some(function (id) {
+          var el = document.getElementById(id);
+          return el && el.classList.contains('open');
+        });
+        if (!anyOpen) return;
+        // If the click target is inside any open panel, do nothing
+        var insidePanel = panelIds.some(function (id) {
+          var el = document.getElementById(id);
+          return el && el.classList.contains('open') && el.contains(e.target);
+        });
+        // Also ignore clicks on the header action buttons that toggle panels
+        var toggleBtnIds = ['btnWeights','btnRules','btnSchedule','btnInfo',
+                            'btnCloseWeights','btnCloseRules','btnCloseSchedule'];
+        var isToggleBtn = toggleBtnIds.some(function (id) {
+          var el = document.getElementById(id);
+          return el && (el === e.target || el.contains(e.target));
+        });
+        if (!insidePanel && !isToggleBtn) {
+          safetyDash.closePanels();
+        }
+      });
 
       // Initialise Firestore (auth + ensure doc), then load theme/schedule,
       // then kick off the data fetch — all in sequence so _docRef is set
