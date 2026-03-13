@@ -314,7 +314,9 @@ body.light .toggle-thumb { transform: translateX(16px); }
   z-index: 50;
 }
 #panelOverlay.active { display: block; }
-.panel { position: relative; }
+/* Panels sit above the overlay (60) so they are clickable,
+   but below the dashboard sticky header (100) so they scroll under it. */
+.panel { position: relative; z-index: 60; }
 .panel-footer { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; flex-wrap: wrap; align-items: center; }
 
 /* ── Weight Grid ────────────────────────────────────────── */
